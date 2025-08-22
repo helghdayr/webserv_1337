@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/21 14:33:46 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/21 16:54:18 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -518,6 +518,8 @@ std::string Response::DefaultForMatchError(void)
 		return "./error_pages/Length_Required.html";
 	else if (error == Content_Too_Large)
 		return "./error_pages/Content_Too_Large.html";
+	else if (error == Request_Timeout)
+		return ("./error_pages/Request_Timeout.html");
 	else if (error == URI_Too_Long)
 		return "./error_pages/URI_Too_Long.html";
 	else if (error == Unsupported_Media_Type)

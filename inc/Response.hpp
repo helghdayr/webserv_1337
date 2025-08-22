@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:28:12 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/21 12:26:33 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/21 16:50:35 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -80,6 +80,7 @@ enum ResponseNumberState
     Forbidden = 403,
     Not_Found = 404,
     Method_Not_Allowed = 405,
+    Request_Timeout = 408,
     Conflict = 409,
     Length_Required = 411,
     Content_Too_Large = 413,

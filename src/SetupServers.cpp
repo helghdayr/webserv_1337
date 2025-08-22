@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   SetupServers.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mthamir <mthamir@student.42.fr>            +#+  +:+       +#+        */
+/*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/21 20:57:28 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/19 15:25:54 by mthamir          ###   ########.fr       */
+/*   Updated: 2025/08/21 17:51:47 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -205,7 +205,7 @@ void	SetupServers::RemoveSocketFromEpoll(int fd, int job)
 
 void    SetupServers::WaitEpoll(void)
 {
-	number_events = epoll_wait(fd_epoll, events, MAX_EVENTS, -1);
+	number_events = epoll_wait(fd_epoll, events, MAX_EVENTS, 2000);
 
 	if (number_events < 0)
 	{
@@ -292,11 +292,12 @@ void    SetupServers::Run(void)
 			{
 				if (fd_sockets.begin() + endpoints != find(fd_sockets.begin(), fd_sockets.begin() + endpoints, fd))
 				{
+					Requests[fd].SetTimeConnection(time(NULL));
 					AcceptConnection(fd);
 					AddSocketToEpoll(fd_sockets.back(), EPOLLIN, EPOLL_CTL_ADD);
 				}
 				else
-				{
+				{	
 					Requests[fd].startParse(fd, config, GetBlockServer(fd));
 					if (Requests[fd].getParseState() == FINISH || Requests[fd].getParseState() == ERROR)
 						AddSocketToEpoll(fd, EPOLLOUT, EPOLL_CTL_MOD);
@@ -336,6 +337,19 @@ void    SetupServers::Run(void)
 				else if (byte < 0)
 					continue;
 
+			}
+		}
+		if (number_events == 0)
+		{
+			for (std::vector<int>::iterator it = fd_sockets.begin() + endpoint; it != fd_sockets.end(); ++it)
+			{
+				server*	block_serv = GetBlockServer(fd);
+				if (time(NULL) - Requests[*it].getTimeConnection() >= block_serv->getClientHeaderTimout())
+				{
+					Response[*it].ResponseWithError(DEFAULT);
+					Response[*it].SetBuildRes(true);
+					AddSocketToEpoll(fd, EPOLLOUT, EPOLL_CTL_MOD);
+				}
 			}
 		}
 	}
