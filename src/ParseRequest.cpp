@@ -772,12 +772,12 @@ bool ParseRequest::isFinish(int RecvReturn) {
     if (CurrntParsState == FINISH)
         std::cout << GRN << "OK " << YLW << "- HTTP request parsed and validated successfully" << RESET << std::endl;
     
-    // else if (CurrntParsState != ERROR && CurrntParsState != FINISH){    
-    //     if (!RecvReturn)
-    //         SwitchState(CLOSE);
-    //     else if (RecvReturn == -1)
-    //         setErrorNumber(400, "Incomplete Request – Client closed connection before completing the request");
-    // }
+    else if (CurrntParsState != ERROR && CurrntParsState != FINISH){    
+        if (!RecvReturn)
+            SwitchState(CLOSE);
+        else if (RecvReturn == -1)
+            setErrorNumber(400, "Incomplete Request – Client closed connection before completing the request");
+    }
     
     return (CurrntParsState == FINISH || CurrntParsState == ERROR || CurrntParsState == CLOSE );
 }
@@ -1114,29 +1114,30 @@ Server*    ParseRequest::findBlockServer(const Config& config, std::string buff,
 
 void    ParseRequest::ReadAndParseRequestBody(std::string&    buff, int fd){
 
+    (void ) fd;
     RequestBufferbody.assign( buff.begin(), buff.end());
-    std::cout << YLW << buff << RESET;
-    size_t  ByetsReadsFromBody = buff.size();
+    // std::cout << YLW << buff << RESET;
+    // size_t  ByetsReadsFromBody = buff.size();
     buff.clear();
     ssize_t ReadedBytes = 0;
-    while (true){
+    // while (true){
 
         std::memset(ReadingBuffer, 0, READING_BUFFER_SIZE);
-        ReadedBytes = recv(fd, ReadingBuffer, READING_BUFFER_SIZE, 0);
-        std::cout <<RED<<"\n\n\n\n\n\n\n\n\n\n"<< RequestBufferbody.size() << "\n\n\n\n\n\n\n\n" << RESET ;
+        // ReadedBytes = recv(fd, ReadingBuffer, READING_BUFFER_SIZE, 0);
+        // std::cout <<RED<<"\n\n\n\n\n\n\n\n\n\n"<< RequestBufferbody.size() << "\n\n\n\n\n\n\n\n" << RESET ;
         if (ReadedBytes > 0){
-            ByetsReadsFromBody += ReadedBytes;
+            // ByetsReadsFromBody += ReadedBytes;
             RequestBufferbody.insert(RequestBufferbody.end(), &ReadingBuffer[0], ReadingBuffer + ReadedBytes);
 
         }
-        std::cout << YLW << ByetsReadsFromBody << RESET << "         \n\n\n" ;
+        // std::cout << YLW << ByetsReadsFromBody << RESET << "         \n\n\n" ;
         (this->*ParseRequest::SecondParseTable[CurrntParsState])(RequestBufferbody);
 	
         if (ReadedBytes <= 0){
             if (isFinish(ReadedBytes))
                 return ;
         }
-    }
+    // }
 }
 
 void    ParseRequest::ReadAndParseIntilHeadersFinish(std::string& buff, int fd, const Config& config, Server* server){
@@ -1147,54 +1148,68 @@ void    ParseRequest::ReadAndParseIntilHeadersFinish(std::string& buff, int fd, 
         std::memset(ReadingBuffer, 0, READING_BUFFER_SIZE);
         ssize_t ReadedBytes = recv(fd, ReadingBuffer, READING_BUFFER_SIZE, 0);
         
+        std::cout << YLW << "\n\n\n\n\n\n -----------  " << ReadedBytes << " -----------\n\n\n" << RESET ;
+        std::cout << YLW << "\n\n\n\n\n\n -----------  Currentparse state" << CurrntParsState << " -----------\n\n\n" << RESET ;
         if (ReadedBytes > 0){
             ReadingBuffer[ReadedBytes] = 0;
             buff.append(ReadingBuffer, ReadedBytes);
         }
-        
-        if (buff.find(HEADERS_ENDING) != std::string::npos){
-            if (!FindBlockServerCheck){
-                S = findBlockServer(config, buff, server);
-                FindBlockServerCheck++;
-            }
-            while (!buff.empty() && (pos = buff.find(CLRF)) != std::string::npos){
-                if (Current_PrasingLine.empty()){
-                    Current_PrasingLine = buff.substr(0, pos + 2);
-					std::cout << RED << "current Prase Line   : " << Current_PrasingLine << RESET;
-                    buff.erase(0, pos + 2);
-                    if (Current_PrasingLine.find(CLRF) == 0){
-                        // buff.erase(0, 2);
-						if (!checkIsThereaHost())
-            				return (setErrorNumber(400, "Bad Request – Missing or empty 'Host' header (required in HTTP/1.1)"));
-        				CheckingForBody();
-						return ;
-					}
+        if (ReadingPhase == READING_HEADERS){
+            if (buff.find(HEADERS_ENDING) != std::string::npos){
+                if (!FindBlockServerCheck){
+                    S = findBlockServer(config, buff, server);
+                    FindBlockServerCheck++;
                 }
-                (this->*ParseRequest::FirstParseTable[CurrntParsState])(Current_PrasingLine);
-            }
+                while (CurrntParsState != ERROR && !buff.empty() && (pos = buff.find(CLRF)) != std::string::npos){
+                    if (Current_PrasingLine.empty()){
+                        Current_PrasingLine = buff.substr(0, pos + 2);
+                        std::cout << RED << "current Prase Line   : " << Current_PrasingLine << RESET;
+                        if (buff.size() >= 2)
+                            buff.erase(0, pos + 2);
+                        if (Current_PrasingLine.find(CLRF) == 0){
+                            if (!checkIsThereaHost())
+                                return (setErrorNumber(400, "Bad Request – Missing or empty 'Host' header (required in HTTP/1.1)"));
+                            CheckingForBody();
+                            break ; 
+                        }
+                    }
+                    (this->*ParseRequest::FirstParseTable[CurrntParsState])(Current_PrasingLine);
+                    if (CurrntParsState == ERROR)
+                        return ;
+                }
         }
-        if (ReadedBytes <= 0){
-            if (isFinish(ReadedBytes) && buff.empty())
-                return ;
+        // if (ReadingPhase == READING_BODY){
+        // }
+        if (Method == "POST" && CurrntParsState > ADD_HEADER && CurrntParsState < PARSEARRAYSIZE){
+            ReadAndParseRequestBody(buff, fd);
         }
+            if (ReadedBytes <= 0){
+                if (!buff.empty())
+                    std::cout << "IS EMPTY    "  << buff << "\n\n\n\n";
+                if  (isFinish(ReadedBytes) && buff.empty())
+                    return ;
+           }
 
+        }
     }
 }
 
-void        ParseRequest::startParse(int fd, const Config& config, Server* server){
+void        ParseRequest::startParse (int fd, const Config& config, Server* server)
+{
         std::string buff;
 
         if (PARSER_NONE == CurrntParsState)
             S = server;
-        
+        ReadingPhase = READING_HEADERS;
         ReadAndParseIntilHeadersFinish(buff, fd, config, server);
-        parseCookies(buff);
-        if (Method == "POST" && CurrntParsState > ADD_HEADER && CurrntParsState < PARSEARRAYSIZE){
-            std::cout << "hhhhhhhhhhh\n\n\n\n";
-            ReadAndParseRequestBody(buff, fd);
-        }
+        if (CurrntParsState != ERROR)
+            parseCookies(buff);
         return ;
+        // if (Method == "POST" && CurrntParsState > ADD_HEADER && CurrntParsState < PARSEARRAYSIZE){
+        //     ReadAndParseRequestBody(buff, fd);
+        // }
 }
+
 
 
 
