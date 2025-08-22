@@ -774,8 +774,9 @@ bool ParseRequest::isFinish(int RecvReturn) {
     else if (CurrntParsState != ERROR && CurrntParsState != FINISH){    
         if (!RecvReturn)
             SwitchState(CLOSE);
-        else if (RecvReturn == -1)
-            setErrorNumber(400, "Incomplete Request – Client closed connection before completing the request");
+        else if (RecvReturn == -1){
+            return (true);
+        }
     }
     
     return (CurrntParsState == FINISH || CurrntParsState == ERROR || CurrntParsState == CLOSE );
@@ -1137,18 +1138,16 @@ void    ParseRequest::ReadAndParseIntilHeadersFinish(std::string& buff, int fd, 
     int FindBlockServerCheck = 0;
 
     while (true){
-
         std::memset(ReadingBuffer, 0, READING_BUFFER_SIZE);
         ssize_t ReadedBytes = recv(fd, ReadingBuffer, READING_BUFFER_SIZE, 0);
         
         if (ReadedBytes > 0){
             ReadingBuffer[ReadedBytes] = 0;
             buff.append(ReadingBuffer, ReadedBytes);
+            // std::cout << buff << "\n";
         }
         if (ReadingPhase == READING_HEADERS)
         {
-            if (buff.find(HEADERS_ENDING) != std::string::npos)
-            {
                 if (!FindBlockServerCheck)
                 {
                     S = findBlockServer(config, buff, server);
@@ -1173,16 +1172,12 @@ void    ParseRequest::ReadAndParseIntilHeadersFinish(std::string& buff, int fd, 
                     (this->*ParseRequest::FirstParseTable[CurrntParsState])(Current_PrasingLine);
                     if (CurrntParsState == ERROR)
                         return ;
-                        // std::cout << "here\n";
                 }
-            }
             if (Method == "POST" && CurrntParsState > ADD_HEADER && CurrntParsState < PARSEARRAYSIZE)
                 ReadAndParseRequestBody(buff, fd);
 
             if (ReadedBytes <= 0)
             {
-                if (!buff.empty())
-
                 if  (isFinish(ReadedBytes) && buff.empty())
                     return ;
             }
@@ -1202,7 +1197,8 @@ void        ParseRequest::startParse (int fd, const Config& config, Server* serv
 
         setTimeConnection(time(NULL));
         ReadAndParseIntilHeadersFinish(buff, fd, config, server);
-
+        if (CurrntParsState < PARSEARRAYSIZE)
+            return ;
         if (CurrntParsState != ERROR)
             parseCookies(buff);
         std::cout << CurrntParsState << " -- \n";
