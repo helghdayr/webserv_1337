@@ -14,7 +14,7 @@
 #include "Config.hpp"
 
 
-#define READING_BUFFER_SIZE 5
+#define READING_BUFFER_SIZE 5000
 #define HEADERS_ENDING "\r\n\r\n"
 #define CLRF "\r\n"
 #define SPACE ' '
@@ -95,6 +95,7 @@ class ParseRequest{
         std::string                                         QueryString;
         std::map<std::string, std::string>                  cookies;
         Location*                                           MatchLocation;
+        time_t                                              Time;
         
         // FUNCTOIONS_POINTER_PARSING_TABLES_____________________________________________________________
 
@@ -176,10 +177,11 @@ class ParseRequest{
         std::vector<std::vector <char > >&                  getMultipartBuferBody();
         std::vector<std::string >	                  		getMultipartBuferBody_string();
         int                                                 getMatchedLocationBodySizeMax();
-        Server                                              getBlockServer();
+        Server*                                             getBlockServer();
         std::string                                         getCookie(const std::string& name) const;
         const std::map<std::string, std::string>&           getCookies() const;
         Location*                                           getMatchLocation();
+        time_t                                              getTimeConnection();
         
         // SETTER_FUNCTIONS__________________________________________________
 
@@ -192,6 +194,7 @@ class ParseRequest{
         void        Reset();
         void        ResetBuffPos();
         void        setContentEncodingType(int Type);
+        void        setTimeConnection(time_t time);
 };
 
 #endif

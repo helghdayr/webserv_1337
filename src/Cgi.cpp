@@ -111,7 +111,7 @@ void Cgi::parentPipe(ParseRequest& request, int pipe_in[2])
 
 CgiResult Cgi::execute(ParseRequest& request)
 {
-	const size_t	timeout = request.getBlockServer().getClientTimeout();
+	const size_t	timeout = request.getBlockServer()->getClientTimeout();
 
 	if (access(script_path.c_str(), F_OK | R_OK) != 0)
 		return CgiResult(false, "Script not accessible: " + script_path, 403);

@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/21 16:54:18 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/22 11:33:17 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -588,7 +588,7 @@ bool	Response::shouldExecuteCgi(ParseRequest& request)
 void    Response::StartForResponse(ParseRequest request, int fd_client)
 {
 	SetRequest(request);
-	SetBlockServer(request.getBlockServer());
+	SetBlockServer(*(request.getBlockServer()));
 	SetState(request.getErrorNumber());
 	SetPath(request.getUri());
 	SetLocation(request.getMatchLocation());

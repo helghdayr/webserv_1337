@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/21 20:57:28 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/21 17:51:47 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/22 12:07:01 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -102,7 +102,8 @@ void    SetupServers::CreateSocket(Server& server)
 					std::cerr << YLW"Warning: setsockopt(SO_REUSEADDR) failed. errno=" << errno << "\n" << RESET;
 				}
 				this->fd_sockets.push_back(fd_server);
-				this->servers[fd_server] = server;			
+				this->servers[fd_server] = &server;	
+		
 				Advance();
 			}
 		}
@@ -234,6 +235,7 @@ void    SetupServers::AcceptConnection(int fd)
 
 	fd_sockets.push_back(fd_accept);
 	this->servers[fd_accept] = this->servers[fd];
+	this->client_to_server[fd_accept] = fd;
 	
 	Advance();
 }
@@ -252,7 +254,7 @@ void    SetupServers::EraseFd(int fd)
 	close (fd);
 
 	servers.erase(fd);
-	
+	client_to_server.erase(fd);
 	fd_sockets.erase(target);
 	
 	Retreat();
@@ -260,10 +262,20 @@ void    SetupServers::EraseFd(int fd)
 
 Server*	SetupServers::GetBlockServer(int block)
 {
-	std::map<int, Server>::iterator	it = servers.find(block);
+	std::map<int, int>::iterator client_it = client_to_server.find(block);
+	if (client_it != client_to_server.end()) {
+		int listening_fd = client_it->second;
+		std::map<int, Server*>::iterator server_it = servers.find(listening_fd);
+		if (server_it != servers.end())
+			return server_it->second;
+	}
+	
+	std::map<int, Server*>::iterator	it = servers.find(block);
+
 	if (it == servers.end())
 		return NULL;
-	return (&(it->second));
+
+	return it->second;
 }
 
 void    SetupServers::Run(void)
@@ -292,7 +304,7 @@ void    SetupServers::Run(void)
 			{
 				if (fd_sockets.begin() + endpoints != find(fd_sockets.begin(), fd_sockets.begin() + endpoints, fd))
 				{
-					Requests[fd].SetTimeConnection(time(NULL));
+					Requests[fd].setTimeConnection(time(NULL));
 					AcceptConnection(fd);
 					AddSocketToEpoll(fd_sockets.back(), EPOLLIN, EPOLL_CTL_ADD);
 				}
@@ -336,18 +348,22 @@ void    SetupServers::Run(void)
 
 				else if (byte < 0)
 					continue;
-
 			}
 		}
 		if (number_events == 0)
 		{
-			for (std::vector<int>::iterator it = fd_sockets.begin() + endpoint; it != fd_sockets.end(); ++it)
+			for (std::vector<int>::iterator it = fd_sockets.begin() + endpoints; it != fd_sockets.end(); ++it)
 			{
-				server*	block_serv = GetBlockServer(fd);
-				if (time(NULL) - Requests[*it].getTimeConnection() >= block_serv->getClientHeaderTimout())
+				int	fd = *it;
+				Server*	block_serv = Requests[fd].getBlockServer();
+
+				if (!block_serv)
+					block_serv = GetBlockServer(fd);
+
+				if (static_cast<long> (time(NULL) - Requests[fd].getTimeConnection()) >= block_serv->getHeaderTimeout())
 				{
-					Response[*it].ResponseWithError(DEFAULT);
-					Response[*it].SetBuildRes(true);
+					Responses[fd].ResponseWithError(DEFAULT);
+					Responses[fd].SetBuildRes(true);
 					AddSocketToEpoll(fd, EPOLLOUT, EPOLL_CTL_MOD);
 				}
 			}
