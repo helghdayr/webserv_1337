@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/22 11:33:17 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/23 20:43:02 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -135,6 +135,8 @@ std::string Response::getStrState(void) const
 			return ("URI Too Long");
 		case Request_Header_Fields_Too_Large:
 			return ("Request Header Fields Too Large");
+		case Request_Timeout:
+			return ("Request Timeout");
 		case Internal_Server_Error:
 			return ("Internal Server Error");
 		case Not_Implemented:

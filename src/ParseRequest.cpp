@@ -1144,7 +1144,6 @@ void    ParseRequest::ReadAndParseIntilHeadersFinish(std::string& buff, int fd, 
         if (ReadedBytes > 0){
             ReadingBuffer[ReadedBytes] = 0;
             buff.append(ReadingBuffer, ReadedBytes);
-            // std::cout << buff << "\n";
         }
         if (ReadingPhase == READING_HEADERS)
         {

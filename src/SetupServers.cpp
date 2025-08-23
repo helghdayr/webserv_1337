@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   SetupServers.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mthamir <mthamir@student.42.fr>            +#+  +:+       +#+        */
+/*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/21 20:57:28 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/22 23:32:48 by mthamir          ###   ########.fr       */
+/*   Updated: 2025/08/23 20:46:39 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -355,6 +355,7 @@ void    SetupServers::Run(void)
 		{
 			for (std::vector<int>::iterator it = fd_sockets.begin() + endpoints; it != fd_sockets.end(); ++it)
 			{
+				std::cout << "here\n";
 				int	fd = *it;
 				Server*	block_serv = Requests[fd].getBlockServer();
 
@@ -363,6 +364,7 @@ void    SetupServers::Run(void)
 
 				if (static_cast<long> (time(NULL) - Requests[fd].getTimeConnection()) >= block_serv->getHeaderTimeout())
 				{
+					Responses[fd].SetState(Request_Timeout);
 					Responses[fd].ResponseWithError(DEFAULT);
 					Responses[fd].SetBuildRes(true);
 					AddSocketToEpoll(fd, EPOLLOUT, EPOLL_CTL_MOD);
