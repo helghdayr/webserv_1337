@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   SetupServers.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mthamir <mthamir@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/21 20:57:28 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/23 20:46:39 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/26 23:13:07 by mthamir          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -311,7 +311,7 @@ void    SetupServers::Run(void)
 				else
 				{	
 					Requests[fd].startParse(fd, config, GetBlockServer(fd));
-					std ::cout << Requests[fd].getParseState() << "\n";
+					std ::cout <<YLW << "OUT HERE : "<< Requests[fd].getParseState() << std::endl;
 					if (Requests[fd].getParseState() == FINISH || Requests[fd].getParseState() == ERROR)
 						AddSocketToEpoll(fd, EPOLLOUT, EPOLL_CTL_MOD);
 
@@ -355,7 +355,6 @@ void    SetupServers::Run(void)
 		{
 			for (std::vector<int>::iterator it = fd_sockets.begin() + endpoints; it != fd_sockets.end(); ++it)
 			{
-				std::cout << "here\n";
 				int	fd = *it;
 				Server*	block_serv = Requests[fd].getBlockServer();
 

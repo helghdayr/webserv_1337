@@ -14,7 +14,7 @@
 #include "Config.hpp"
 
 
-#define READING_BUFFER_SIZE 50000
+#define READING_BUFFER_SIZE 5
 #define HEADERS_ENDING "\r\n\r\n"
 #define CLRF "\r\n"
 #define SPACE ' '
@@ -69,6 +69,7 @@ class ParseRequest{
         std::string                                         Current_PrasingLine;
         int                                                 ReadingPhase;
         int                                                 errorNumber;
+        std::string                                         Request_Buff;
         size_t                                              pos;
         int                                                 CurrntParsState;
         std::string                                         Current_key;
@@ -84,11 +85,11 @@ class ParseRequest{
         std::vector<std::pair<std::string, std::string> >   Headers;
         bool                                                hasValidHost;
         size_t                                              ChunkSize;
-        std::vector <char >                                 BufferBody;
-        std::vector <char >                                 RequestBufferbody;
+        std::string                                         BufferBody;
+        std::string                                         RequestBufferbody;
         std::string                                         MultipartBoundary;
-        std::vector<std::vector <char > >                   MultipartBufferBody;
-        std::vector <char >                                 DecompressedBufferBody;
+        std::vector<std::string >                           MultipartBufferBody;
+        std::string                                         DecompressedBufferBody;
         std::map<std::string, int>                          NonRepeatablesHeaders;
         std::string                                         Host;
         std::string                                         Port;
@@ -100,9 +101,7 @@ class ParseRequest{
         // FUNCTOIONS_POINTER_PARSING_TABLES_____________________________________________________________
 
         typedef void                                        (ParseRequest::*ParseFuncPtr)(std::string& buffer);
-        typedef void                                        (ParseRequest::*ParseBodyFuncPtr)(std::vector<char >& buffer);
-        static  const ParseFuncPtr                          FirstParseTable[];
-        static  const ParseBodyFuncPtr                      SecondParseTable[];
+        static  const ParseFuncPtr                          ParseTable[];
 
 
     public:
@@ -120,16 +119,14 @@ class ParseRequest{
         void        parseHttpVersion(std::string& str);
         void        parseHeaders(std::string& str);
         void        CheckingForBody();
-        void        parseContentlengthBody(std::vector <char > &str);
-        void        parseChunkedBody(std::vector <char >& str);
-        void        ParseMultipartBodyBoundary(std::vector <char > &None);
-        void        ParseMultiPartBufferBody(std::vector <char > &None);
+        void        parseContentlengthBody(std::string &str);
+        void        parseChunkedBody(std::string& str);
+        void        ParseMultipartBodyBoundary(std::string &None);
+        void        ParseMultiPartBufferBody(std::string &None);
         void        parseCookies(std::string& None);
         void        ReadAndParseIntilHeadersFinish(std::string& buff, int fd, const Config& config, Server* server);
         void        ReadAndParseRequestBody(std::string& buff, int fd);
-        size_t         findInVector(const std::vector<char>& haystack,
-                                  const std::vector<char>& needle,
-                                  size_t startPos);
+
 
         // PARSING_HELPERS_________________________________________________
 
@@ -168,14 +165,14 @@ class ParseRequest{
         std::string&                                        getPort();
         int                                                 getContentEncodingType(int Type);
         std::string&                                        getQueryString(void);
-        std::vector <char >&                                getBufferBody(void);
-        std::string	                                		getBufferBody_string(void);
+        std::string&                                        getBufferBody(void);
+        // std::string	                                		getBufferBody_string(void);
         size_t                                              getContentLength(void);
-        std::vector <char >&                                getBufferDecompressedBody();
-        std::string	                                		getBufferDecompressedBody_string();
+        std::string&                                        getBufferDecompressedBody();
+        // std::string	                                		getBufferDecompressedBody_string();
         const std::vector<std::string>&                     getMatchedLocationAllowedMethods();
-        std::vector<std::vector <char > >&                  getMultipartBuferBody();
-        std::vector<std::string >	                  		getMultipartBuferBody_string();
+        std::vector<std::string>&                           getMultipartBuferBody();
+        // std::vector<std::string >	                  		getMultipartBuferBody();
         int                                                 getMatchedLocationBodySizeMax();
         Server*                                             getBlockServer();
         std::string                                         getCookie(const std::string& name) const;

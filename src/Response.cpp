@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Response.cpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mthamir <mthamir@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/23 20:43:02 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/26 23:28:39 by mthamir          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -413,7 +413,7 @@ bool    Response::Chunked(void)
 {
 	struct stat info;
 
-	Body = Request.getBufferBody_string();
+	Body = Request.getBufferBody();
 	if (path[path.size() - 1] == '/')
 	{
 		if (stat(path.c_str(), &info) == -1)
@@ -444,7 +444,7 @@ void    Response::PostContentResponse(void)
 
 	if (multipart != std::string::npos)
 	{
-		std::vector<std::string>    body = Request.getMultipartBuferBody_string();
+		std::vector<std::string>    body = Request.getMultipartBuferBody();
 		for (size_t i(0); i < body.size(); i++)
 		{
 			std::string old_path = getPath();
@@ -595,7 +595,6 @@ void    Response::StartForResponse(ParseRequest request, int fd_client)
 	SetPath(request.getUri());
 	SetLocation(request.getMatchLocation());
 	this->fd_client = fd_client;
-
 	GetFullPath(path);
 
 	if (ReturnDirective() == false)
