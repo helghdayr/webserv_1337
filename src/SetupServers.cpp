@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   SetupServers.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mthamir <mthamir@student.42.fr>            +#+  +:+       +#+        */
+/*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/21 20:57:28 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/26 23:13:07 by mthamir          ###   ########.fr       */
+/*   Updated: 2025/08/27 14:55:12 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -311,7 +311,6 @@ void    SetupServers::Run(void)
 				else
 				{	
 					Requests[fd].startParse(fd, config, GetBlockServer(fd));
-					std ::cout <<YLW << "OUT HERE : "<< Requests[fd].getParseState() << std::endl;
 					if (Requests[fd].getParseState() == FINISH || Requests[fd].getParseState() == ERROR)
 						AddSocketToEpoll(fd, EPOLLOUT, EPOLL_CTL_MOD);
 

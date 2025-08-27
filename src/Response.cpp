@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/27 14:25:55 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/27 15:35:35 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -404,16 +404,24 @@ bool    Response::Chunked(void)
 	else
 		return (SetState(Forbidden), ResponseWithError(NONE), false);
 
+	if (stat(upload_path.c_str(), &info) == -1)
+		return (SetState(Internal_Server_Error), ResponseWithError(NONE), false);
+
+	size_t	pos = path.find_last_of("/");
+
+	upload_path += path.substr(pos + 1);
+	SetPath(upload_path);
+
 	if (upload_path[upload_path.size() - 1] == '/')
 		return (SetState(Bad_Request), ResponseWithError(NONE), false);
 
-	if (stat(path.c_str(), &info) == -1)
+	if (stat(upload_path.c_str(), &info) == -1)
 		return (SetState(Created), true);
 
 	if (S_ISDIR(info.st_mode))
 		return (SetState(Conflict), ResponseWithError(NONE), false);
 
-	if (access(path.c_str(), W_OK) == -1)
+	if (access(upload_path.c_str(), W_OK) == -1)
 		return (SetState(Forbidden), ResponseWithError(NONE), false);
 
 	return (true);
