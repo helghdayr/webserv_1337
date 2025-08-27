@@ -14,7 +14,7 @@
 #include "Config.hpp"
 
 
-#define READING_BUFFER_SIZE 5
+#define READING_BUFFER_SIZE 5000
 #define HEADERS_ENDING "\r\n\r\n"
 #define CLRF "\r\n"
 #define SPACE ' '

@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/27 15:35:35 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/27 16:27:01 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -344,6 +344,7 @@ bool	Response::MultiPart(std::string body)
 	size_t pos = body.find("Content-Disposition:");
 	ignore = false;
 
+	std::cout << "path === " << path << "\n";
 	if (pos != std::string::npos)
 	{
 		size_t end = body.find('\n', pos);
