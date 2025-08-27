@@ -211,7 +211,7 @@ void	Cgi::writeCgiInput(ParseRequest& request, int pipe_fd)
 			size_t total_written = 0;
 			
 			while (remaining > 0) {
-				ssize_t written = (pipe_fd, data + total_written, remaining);
+				ssize_t written = write(pipe_fd, data + total_written, remaining);
 				
 				if (written < 0) {
 					throw std::runtime_error("Failed to write POST data to CGI script");
