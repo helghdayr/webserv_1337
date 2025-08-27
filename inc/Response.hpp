@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:28:12 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/21 16:50:35 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/27 13:17:41 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "Cgi.hpp"
+#include <fstream>
 
 #define GET "GET"
 #define POST "POST"
@@ -112,6 +113,7 @@ class Response{
 			<std::string>	cookies_to_set;
         std::string         responseBody;
         bool                buildRes;
+        bool                ignore;
         size_t              bytes;
 		
 

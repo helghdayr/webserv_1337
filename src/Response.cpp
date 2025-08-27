@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Response.cpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mthamir <mthamir@student.42.fr>            +#+  +:+       +#+        */
+/*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/26 23:28:39 by mthamir          ###   ########.fr       */
+/*   Updated: 2025/08/27 14:25:55 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -341,8 +341,8 @@ bool	Response::MultiPart(std::string body)
 {
 	struct stat	info;
 	std::string	filename;
-
 	size_t pos = body.find("Content-Disposition:");
+	ignore = false;
 
 	if (pos != std::string::npos)
 	{
@@ -357,8 +357,12 @@ bool	Response::MultiPart(std::string body)
 				if (start != std::string::npos && finish != std::string::npos)
 					filename = line.substr(start + 1, finish - (start + 1));
 			}
+			else
+				return (ignore = true, true);
 		}
 	}
+	if (filename.empty())
+		return (ignore = true, true);
 
 	size_t clrf = body.find("\r\n\r\n");
 	if (clrf != std::string::npos)
@@ -371,41 +375,15 @@ bool	Response::MultiPart(std::string body)
 		if (upload_path[upload_path.size() - 1] != '/')
 			upload_path += "/";
 	}
-
-	if (upload_path[upload_path.size() - 1] == '/')
-	{
-		if (stat(upload_path.c_str(), &info) == -1)
-		{
-			if (mkdir(upload_path.c_str(), 0755) == -1)
-				return (SetState(Internal_Server_Error), ResponseWithError(NONE), false);
-			if (stat(upload_path.c_str(), &info) == -1)
-				return (SetState(Not_Found), ResponseWithError(NONE), false);
-		}
-
-		if (!S_ISDIR(info.st_mode))
-			return (SetState(Not_Found), ResponseWithError(NONE), false);
-	}
 	else
-	{
-		if (stat(upload_path.c_str(), &info) == -1)
-			return (SetState(Created), true);
-
-		if (S_ISDIR(info.st_mode))
-			return (SetState(Conflict), ResponseWithError(NONE), false);
-	}
-
-	if (access(upload_path.c_str(), W_OK) == -1)
 		return (SetState(Forbidden), ResponseWithError(NONE), false);
 
-	if (!filename.empty())
-	{
-		if (upload_path[upload_path.size() - 1] == '/')
-			SetPath(upload_path + filename);
-		else
-			SetPath(upload_path + "/" + filename);
-	}
-	else
-		return (SetState(Bad_Request), ResponseWithError(NONE), false);
+	if (stat(upload_path.c_str(), &info) == -1 || !S_ISDIR(info.st_mode)
+		|| access(upload_path.c_str(), W_OK) == -1)
+		return (SetState(Internal_Server_Error), ResponseWithError(NONE), false);
+
+	SetPath(upload_path + filename);
+
 	return true;
 }
 
@@ -414,16 +392,20 @@ bool    Response::Chunked(void)
 	struct stat info;
 
 	Body = Request.getBufferBody();
-	if (path[path.size() - 1] == '/')
+
+	std::string upload_path = path;
+
+	if (location && !location->getUploadStore().empty())
 	{
-		if (stat(path.c_str(), &info) == -1)
-			return (SetState(Not_Found), ResponseWithError(NONE), false);
-
-		if (S_ISDIR(info.st_mode))
-			return (SetState(Conflict), ResponseWithError(NONE), false);
-
-		return (SetState(Bad_Request), ResponseWithError(NONE), false);
+		upload_path = location->getUploadStore();
+		if (upload_path[upload_path.size() - 1] != '/')
+			upload_path += "/";
 	}
+	else
+		return (SetState(Forbidden), ResponseWithError(NONE), false);
+
+	if (upload_path[upload_path.size() - 1] == '/')
+		return (SetState(Bad_Request), ResponseWithError(NONE), false);
 
 	if (stat(path.c_str(), &info) == -1)
 		return (SetState(Created), true);
@@ -431,7 +413,7 @@ bool    Response::Chunked(void)
 	if (S_ISDIR(info.st_mode))
 		return (SetState(Conflict), ResponseWithError(NONE), false);
 
-	if (access(path.c_str(), F_OK | W_OK) == -1)
+	if (access(path.c_str(), W_OK) == -1)
 		return (SetState(Forbidden), ResponseWithError(NONE), false);
 
 	return (true);
@@ -450,16 +432,17 @@ void    Response::PostContentResponse(void)
 			std::string old_path = getPath();
 			if (MultiPart(body[i]) == false)
 				return ;
+			
+			if (ignore)
+				continue ;
 
-			int fd_file(0);
+			std::ofstream	fd(path.c_str());
 
-			if ((fd_file = open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644)) == -1)
-				return (SetState(Forbidden), ResponseWithError(NONE));
-
-			if (write(fd_file, Body.c_str(), Body.size()) == -1)
-				return (close(fd_file), SetState(Internal_Server_Error), ResponseWithError(NONE));
-
-			close(fd_file);
+			if (fd)
+			{
+				fd << Body;
+				fd.close();
+			}
 
 			SetPath(old_path);
 			Body = "";
@@ -473,15 +456,13 @@ void    Response::PostContentResponse(void)
 			return ;
 	}
 
-	int fd_file(0);
+	std::ofstream	fd(path.c_str());
 
-	if ((fd_file = open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644)) == -1)
-		return (SetState(Forbidden), ResponseWithError(NONE));
-
-	if (write(fd_file, Body.c_str(), Body.size()) == -1)
-		return (close(fd_file), SetState(Internal_Server_Error), ResponseWithError(NONE));
-
-	close(fd_file);
+	if (fd)
+	{
+		fd << Body;
+		fd.close();
+	}
 
 	BuildPostResponse();
 }
@@ -605,7 +586,7 @@ void    Response::StartForResponse(ParseRequest request, int fd_client)
 		try {
 			handleCgiRequest(Request);
 		} catch (...) {
-			SetState(500);
+			SetState(Internal_Server_Error);
 			ResponseWithError(NONE);
 		}
 		return;
