@@ -874,12 +874,12 @@ void ParseRequest::trimBuffTail(std::string &str){
 // check request verison and define the error number if its not valid ;
 bool ParseRequest::isValidVersion(){
 
-    if (HttpProtocolVersion == "HTTP/1.1")
+    if (HttpProtocolVersion == "HTTP/1.1" || HttpProtocolVersion == "HTTP/1.0")
     {
         return (true);
     }
 
-    if (HttpProtocolVersion == "HTTP/0.9" || HttpProtocolVersion == "HTTP/2" || HttpProtocolVersion == "HTTP/3"  || HttpProtocolVersion == "HTTP/1.0")
+    if (HttpProtocolVersion == "HTTP/0.9" || HttpProtocolVersion == "HTTP/2" || HttpProtocolVersion == "HTTP/3")
         return (setErrorNumber(505, "HTTP Version Not Supported – '" + HttpProtocolVersion + "' is not supported by the server"), false);
 
     return (setErrorNumber(400, "Bad Request – Malformed or invalid HTTP version: '" + HttpProtocolVersion + "'"), false);
@@ -1136,7 +1136,7 @@ void    ParseRequest::ReadAndParseIntilHeadersFinish(std::string& buff, int fd, 
                             buff.erase(0, pos + 2);
                         if (Current_PrasingLine.find(CLRF) == 0)
                         {
-                            if (!checkIsThereaHost())
+                            if (HttpProtocolVersion == "HTTP/1.1" && !checkIsThereaHost())
                                 return (setErrorNumber(400, "Bad Request – Missing or empty 'Host' header (required in HTTP/1.1)"));
                             CheckingForBody();
                             break ; 
