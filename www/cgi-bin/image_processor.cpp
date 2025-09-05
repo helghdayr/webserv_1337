@@ -1,539 +1,241 @@
 #include <iostream>
-#include <fstream>
 #include <sstream>
 #include <string>
-#include <vector>
 #include <map>
-#include <algorithm>
-#include <iomanip>
 #include <cstdlib>
 #include <cstring>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <ctime>
 #include <cmath>
-#include <unistd.h>
 
-struct ImageInfo {
-    std::string name;
-    std::string type;
-    std::string mime_type;
-    long size;
-    std::string dimensions;
-    std::string modified;
-    std::string created;
-    std::string color_info;
-    std::string bit_depth;
-    std::string compression;
-    std::string color_space;
-    std::string aspect_ratio;
-    std::string file_signature;
-    std::string estimated_colors;
-    std::string dominant_colors;
-    std::string brightness_info;
-    std::string contrast_info;
-    std::string file_permissions;
-    std::string file_owner;
-    std::string checksum;
-};
-
-class ImageProcessor {
+class Calculator {
 private:
-    std::string upload_dir;
-    std::string web_upload_dir;
+    std::map<std::string, std::string> params;
+    std::string request_method;
+
+    void parseQueryString(const std::string& query) {
+        std::istringstream iss(query);
+        std::string pair;
+        
+        while (std::getline(iss, pair, '&')) {
+            size_t pos = pair.find('=');
+            if (pos != std::string::npos) {
+                std::string key = pair.substr(0, pos);
+                std::string value = pair.substr(pos + 1);
+                params[key] = urlDecode(value);
+            }
+        }
+    }
+
+    void parsePostData() {
+        char* content_length_str = getenv("CONTENT_LENGTH");
+        if (!content_length_str) return;
+        
+        int content_length = atoi(content_length_str);
+        if (content_length <= 0 || content_length > 10000) return;
+        
+        std::string post_data(content_length, '\0');
+        std::cin.read(&post_data[0], content_length);
+        
+        parseQueryString(post_data);
+    }
+
+    std::string urlDecode(const std::string& str) {
+        std::string result;
+        for (size_t i = 0; i < str.length(); ++i) {
+            if (str[i] == '+') {
+                result += ' ';
+            } else if (str[i] == '%' && i + 2 < str.length()) {
+                int hex_value;
+                std::istringstream hex_stream(str.substr(i + 1, 2));
+                if (hex_stream >> std::hex >> hex_value) {
+                    result += static_cast<char>(hex_value);
+                    i += 2;
+                } else {
+                    result += str[i];
+                }
+            } else {
+                result += str[i];
+            }
+        }
+        return result;
+    }
+
+    double calculate(const std::string& operation, double a, double b) {
+        if (operation == "add") return a + b;
+        if (operation == "subtract") return a - b;
+        if (operation == "multiply") return a * b;
+        if (operation == "divide") return (b != 0) ? a / b : 0;
+        if (operation == "power") return pow(a, b);
+        if (operation == "modulo") return (b != 0) ? fmod(a, b) : 0;
+        return 0;
+    }
+
+    std::string getOperationSymbol(const std::string& operation) {
+        if (operation == "add") return "+";
+        if (operation == "subtract") return "-";
+        if (operation == "multiply") return "×";
+        if (operation == "divide") return "÷";
+        if (operation == "power") return "^";
+        if (operation == "modulo") return "%";
+        return "?";
+    }
 
 public:
-    ImageProcessor() : upload_dir("uploads/"), web_upload_dir("/uploads/") {
-        mkdir(upload_dir.c_str(), 0755);
-    }
-
-    std::string get_extension(const std::string& filename) {
-        size_t pos = filename.find_last_of('.');
-        if (pos != std::string::npos) {
-            std::string ext = filename.substr(pos + 1);
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-            return ext;
-        }
-        return "";
-    }
-
-    std::string get_mime_type(const std::string& ext) {
-        if (ext == "jpg" || ext == "jpeg") return "image/jpeg";
-        if (ext == "png") return "image/png";
-        if (ext == "gif") return "image/gif";
-        if (ext == "bmp") return "image/bmp";
-        if (ext == "webp") return "image/webp";
-        if (ext == "tiff" || ext == "tif") return "image/tiff";
-        if (ext == "svg") return "image/svg+xml";
-        return "application/octet-stream";
-    }
-
-    std::string get_file_signature(const std::string& path) {
-        std::ifstream file(path, std::ios::binary);
-        if (!file) return "Unknown";
+    Calculator() {
+        request_method = getenv("REQUEST_METHOD") ? getenv("REQUEST_METHOD") : "GET";
         
-        char header[16];
-        file.read(header, 16);
-        
-        std::ostringstream sig;
-        for (int i = 0; i < 8; i++) {
-            sig << std::hex << std::setfill('0') << std::setw(2) 
-                << (unsigned char)header[i] << " ";
-        }
-        return sig.str();
-    }
-
-    std::string calculate_checksum(const std::string& path) {
-        std::ifstream file(path, std::ios::binary);
-        if (!file) return "Unknown";
-        
-        unsigned long hash = 5381;
-        char c;
-        while (file.get(c)) {
-            hash = ((hash << 5) + hash) + c;
-        }
-        
-        std::ostringstream checksum;
-        checksum << std::hex << hash;
-        return checksum.str();
-    }
-
-    std::pair<int, int> get_image_dimensions_pair(const std::string& path) {
-        std::ifstream file(path, std::ios::binary);
-        if (!file) return {0, 0};
-
-        char header[24];
-        file.read(header, 24);
-
-        std::string ext = get_extension(path);
-
-        if (ext == "jpg" || ext == "jpeg") {
-            return get_jpeg_dimensions_pair(file);
-        } else if (ext == "png") {
-            return get_png_dimensions_pair(header);
-        } else if (ext == "gif") {
-            return get_gif_dimensions_pair(header);
-        } else if (ext == "bmp") {
-            return get_bmp_dimensions_pair(header);
-        }
-
-        return {0, 0};
-    }
-
-    std::string get_image_dimensions(const std::string& path) {
-        auto dims = get_image_dimensions_pair(path);
-        if (dims.first == 0 || dims.second == 0) return "Unknown";
-        return std::to_string(dims.first) + "x" + std::to_string(dims.second);
-    }
-
-    std::string get_aspect_ratio(const std::string& path) {
-        auto dims = get_image_dimensions_pair(path);
-        if (dims.first == 0 || dims.second == 0) return "Unknown";
-        
-        int gcd_val = std::__gcd(dims.first, dims.second);
-        int ratio_w = dims.first / gcd_val;
-        int ratio_h = dims.second / gcd_val;
-        
-        return std::to_string(ratio_w) + ":" + std::to_string(ratio_h);
-    }
-
-    std::pair<int, int> get_jpeg_dimensions_pair(std::ifstream& file) {
-        file.seekg(0, std::ios::beg);
-        char buffer[2];
-
-        while (file.read(buffer, 2)) {
-            if ((unsigned char)buffer[0] == 0xFF && (unsigned char)buffer[1] == 0xC0) {
-                file.seekg(3, std::ios::cur);
-                char dims[4];
-                file.read(dims, 4);
-                int height = ((unsigned char)dims[0] << 8) | (unsigned char)dims[1];
-                int width = ((unsigned char)dims[2] << 8) | (unsigned char)dims[3];
-                return {width, height};
+        if (request_method == "GET") {
+            char* query_string = getenv("QUERY_STRING");
+            if (query_string) {
+                parseQueryString(query_string);
             }
+        } else if (request_method == "POST") {
+            parsePostData();
         }
-        return {0, 0};
     }
 
-    std::pair<int, int> get_png_dimensions_pair(const char* header) {
-        if (header[0] == (char)0x89 && header[1] == 'P' && header[2] == 'N' && header[3] == 'G') {
-            int width = ((unsigned char)header[16] << 24) | ((unsigned char)header[17] << 16) |
-                       ((unsigned char)header[18] << 8) | (unsigned char)header[19];
-            int height = ((unsigned char)header[20] << 24) | ((unsigned char)header[21] << 16) |
-                        ((unsigned char)header[22] << 8) | (unsigned char)header[23];
-            return {width, height};
-        }
-        return {0, 0};
-    }
-
-    std::pair<int, int> get_gif_dimensions_pair(const char* header) {
-        if (header[0] == 'G' && header[1] == 'I' && header[2] == 'F') {
-            int width = (unsigned char)header[6] | ((unsigned char)header[7] << 8);
-            int height = (unsigned char)header[8] | ((unsigned char)header[9] << 8);
-            return {width, height};
-        }
-        return {0, 0};
-    }
-
-    std::pair<int, int> get_bmp_dimensions_pair(const char* header) {
-        if (header[0] == 'B' && header[1] == 'M') {
-            int width = ((unsigned char)header[18]) | ((unsigned char)header[19] << 8) |
-                       ((unsigned char)header[20] << 16) | ((unsigned char)header[21] << 24);
-            int height = ((unsigned char)header[22]) | ((unsigned char)header[23] << 8) |
-                        ((unsigned char)header[24] << 16) | ((unsigned char)header[25] << 24);
-            return {width, height};
-        }
-        return {0, 0};
-    }
-
-    std::string get_bit_depth(const std::string& path) {
-        std::ifstream file(path, std::ios::binary);
-        if (!file) return "Unknown";
-        
-        char header[32];
-        file.read(header, 32);
-        std::string ext = get_extension(path);
-        
-        if (ext == "png") {
-            if (header[0] == (char)0x89 && header[1] == 'P' && header[2] == 'N' && header[3] == 'G') {
-                unsigned char bit_depth = (unsigned char)header[24];
-                unsigned char color_type = (unsigned char)header[25];
-                std::string color_desc;
-                switch (color_type) {
-                    case 0: color_desc = " (Grayscale)"; break;
-                    case 2: color_desc = " (RGB)"; break;
-                    case 3: color_desc = " (Palette)"; break;
-                    case 4: color_desc = " (Grayscale + Alpha)"; break;
-                    case 6: color_desc = " (RGBA)"; break;
-                    default: color_desc = " (Unknown)"; break;
-                }
-                return std::to_string(bit_depth) + " bits" + color_desc;
-            }
-        } else if (ext == "jpg" || ext == "jpeg") {
-            return "8 bits (JPEG)";
-        } else if (ext == "gif") {
-            return "8 bits (GIF)";
-        } else if (ext == "bmp") {
-            if (header[0] == 'B' && header[1] == 'M') {
-                unsigned short bits = ((unsigned char)header[28]) | ((unsigned char)header[29] << 8);
-                return std::to_string(bits) + " bits (BMP)";
-            }
-        }
-        
-        return "Unknown";
-    }
-
-    std::string get_compression_info(const std::string& path) {
-        std::string ext = get_extension(path);
-        if (ext == "jpg" || ext == "jpeg") return "JPEG (Lossy)";
-        if (ext == "png") return "PNG (Lossless)";
-        if (ext == "gif") return "LZW (Lossless)";
-        if (ext == "bmp") return "None (Uncompressed)";
-        if (ext == "webp") return "WebP (Lossy/Lossless)";
-        return "Unknown";
-    }
-
-    std::string analyze_colors(const std::string& path) {
-        std::ifstream file(path, std::ios::binary);
-        if (!file) return "Analysis not available";
-
-        file.seekg(0, std::ios::end);
-        size_t size = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        if (size > 1024 * 1024) { // Limit to 1MB for analysis
-            size = 1024 * 1024;
-        }
-
-        std::vector<char> buffer(size);
-        file.read(buffer.data(), size);
-
-        std::map<std::string, int> color_freq;
-        int total_brightness = 0;
-        int pixel_count = 0;
-        int contrast_sum = 0;
-
-        // Sample every 100th byte for performance
-        for (size_t i = 0; i < size - 2; i += 100) {
-            if (i + 2 < size) {
-                unsigned char r = (unsigned char)buffer[i];
-                unsigned char g = (unsigned char)buffer[i + 1];
-                unsigned char b = (unsigned char)buffer[i + 2];
-
-                // Calculate brightness
-                int brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                total_brightness += brightness;
-                
-                // Simple contrast calculation
-                int max_rgb = std::max({r, g, b});
-                int min_rgb = std::min({r, g, b});
-                contrast_sum += (max_rgb - min_rgb);
-
-                std::ostringstream color_key;
-                color_key << std::hex << std::setfill('0') << std::setw(2) << (int)r
-                         << std::setw(2) << (int)g << std::setw(2) << (int)b;
-                color_freq[color_key.str()]++;
-                pixel_count++;
-
-                if (pixel_count > 1000) break;
-            }
-        }
-
-        if (pixel_count == 0) return "No color data available";
-
-        // Find dominant colors
-        std::vector<std::pair<std::string, int>> sorted_colors(color_freq.begin(), color_freq.end());
-        std::sort(sorted_colors.begin(), sorted_colors.end(),
-            [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
-                return a.second > b.second;
-            });
-
-        std::ostringstream result;
-        result << "Estimated " << color_freq.size() << " unique colors sampled";
-        
-        return result.str();
-    }
-
-    std::string get_dominant_colors(const std::string& path) {
-        std::ifstream file(path, std::ios::binary);
-        if (!file) return "Unknown";
-
-        file.seekg(0, std::ios::end);
-        size_t size = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        if (size > 512 * 1024) size = 512 * 1024; // Limit analysis
-
-        std::vector<char> buffer(size);
-        file.read(buffer.data(), size);
-
-        std::map<std::string, int> color_freq;
-        
-        for (size_t i = 0; i < size - 2; i += 50) {
-            if (i + 2 < size) {
-                unsigned char r = (unsigned char)buffer[i];
-                unsigned char g = (unsigned char)buffer[i + 1];
-                unsigned char b = (unsigned char)buffer[i + 2];
-
-                std::ostringstream color_key;
-                color_key << "#" << std::hex << std::setfill('0') << std::setw(2) << (int)r
-                         << std::setw(2) << (int)g << std::setw(2) << (int)b;
-                color_freq[color_key.str()]++;
-            }
-        }
-
-        std::vector<std::pair<std::string, int>> sorted_colors(color_freq.begin(), color_freq.end());
-        std::sort(sorted_colors.begin(), sorted_colors.end(),
-            [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
-                return a.second > b.second;
-            });
-
-        std::ostringstream result;
-        int count = 0;
-        for (const auto& color : sorted_colors) {
-            if (count >= 5) break;
-            if (count > 0) result << ", ";
-            result << color.first;
-            count++;
-        }
-        
-        return result.str();
-    }
-
-    std::string get_brightness_info(const std::string& path) {
-        std::ifstream file(path, std::ios::binary);
-        if (!file) return "Unknown";
-
-        file.seekg(0, std::ios::end);
-        size_t size = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        if (size > 256 * 1024) size = 256 * 1024;
-
-        std::vector<char> buffer(size);
-        file.read(buffer.data(), size);
-
-        long total_brightness = 0;
-        int pixel_count = 0;
-
-        for (size_t i = 0; i < size - 2; i += 30) {
-            if (i + 2 < size) {
-                unsigned char r = (unsigned char)buffer[i];
-                unsigned char g = (unsigned char)buffer[i + 1];
-                unsigned char b = (unsigned char)buffer[i + 2];
-
-                int brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                total_brightness += brightness;
-                pixel_count++;
-            }
-        }
-
-        if (pixel_count == 0) return "Unknown";
-
-        int avg_brightness = total_brightness / pixel_count;
-        std::string level;
-        if (avg_brightness < 64) level = "Very Dark";
-        else if (avg_brightness < 128) level = "Dark";
-        else if (avg_brightness < 192) level = "Medium";
-        else level = "Bright";
-
-        return level + " (" + std::to_string(avg_brightness) + "/255)";
-    }
-
-    std::string get_file_permissions(const std::string& path) {
-        struct stat st;
-        if (stat(path.c_str(), &st) != 0) return "Unknown";
-        
-        std::ostringstream perms;
-        perms << std::oct << (st.st_mode & 0777);
-        return perms.str();
-    }
-
-    std::string format_size(long size) {
-        double kb = size / 1024.0;
-        double mb = kb / 1024.0;
-        double gb = mb / 1024.0;
-        std::ostringstream out;
-        out << std::fixed << std::setprecision(2);
-        if (gb >= 1.0) out << gb << " GB";
-        else if (mb >= 1.0) out << mb << " MB";
-        else if (kb >= 1.0) out << kb << " KB";
-        else out << size << " B";
-        return out.str();
-    }
-
-    std::string save_uploaded_file() {
-        std::string method = getenv("REQUEST_METHOD") ? getenv("REQUEST_METHOD") : "";
-        if (method != "POST") return "";
-
-        char* len_str = getenv("CONTENT_LENGTH");
-        if (!len_str) return "";
-        int content_length = atoi(len_str);
-        if (content_length <= 0) return "";
-
-        std::string content_type = getenv("CONTENT_TYPE") ? getenv("CONTENT_TYPE") : "";
-        size_t pos = content_type.find("boundary=");
-        if (pos == std::string::npos) return "";
-        std::string boundary = "--" + content_type.substr(pos + 9);
-
-        std::string data(content_length, '\0');
-        std::cin.read(&data[0], content_length);
-
-        size_t file_start = data.find("\r\n\r\n");
-        if (file_start == std::string::npos) return "";
-        file_start += 4;
-
-        size_t file_end = data.find(boundary, file_start);
-        if (file_end == std::string::npos) return "";
-        file_end -= 2; // skip \r\n before boundary
-
-        // Extract filename
-        size_t fn_start = data.find("filename=\"");
-        if (fn_start == std::string::npos) return "";
-        fn_start += 10;
-        size_t fn_end = data.find("\"", fn_start);
-        std::string filename = data.substr(fn_start, fn_end - fn_start);
-
-        // Generate unique filename to avoid conflicts
-        std::time_t now = std::time(0);
-        std::ostringstream unique_name;
-        unique_name << now << "_" << filename;
-        
-        std::string filepath = upload_dir + unique_name.str();
-        std::ofstream out(filepath, std::ios::binary);
-        out.write(&data[file_start], file_end - file_start);
-        out.close();
-
-        return filepath;
-    }
-
-    void generate_html() {
+    void generateHTML() {
         std::cout << "Content-Type: text/html\r\n\r\n";
-        std::cout << "<!DOCTYPE html><html><head><title>Image Processor</title>\n";
-        std::cout << "<style>body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #fff; margin: 20px; }";
-        std::cout << ".container { max-width: 900px; margin: auto; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; }";
-        std::cout << "h1 { color: #ff5722; text-align: center; margin-bottom: 20px; }";
-        std::cout << ".card { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px; margin-bottom: 20px; }";
-        std::cout << "table { width: 100%; border-collapse: collapse; margin-top: 15px; }";
-        std::cout << "th,td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left; }";
-        std::cout << "th { background: rgba(255,87,34,0.2); color: #ff5722; }";
-        std::cout << ".image-preview { max-width: 150px; max-height: 150px; border-radius: 6px; }</style></head><body>";
-        std::cout << "<div class='container'><h1>Image Processor</h1>";
+        std::cout << "<!DOCTYPE html>\n<html>\n<head>\n";
+        std::cout << "<title>Calculator - GET/POST Demo</title>\n";
+        std::cout << "<style>\n";
+        std::cout << "body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #fff; margin: 20px; }\n";
+        std::cout << ".container { max-width: 600px; margin: auto; background: rgba(255,255,255,0.05); padding: 30px; border-radius: 15px; }\n";
+        std::cout << "h1 { color: #4CAF50; text-align: center; margin-bottom: 30px; }\n";
+        std::cout << ".method-info { background: rgba(76,175,80,0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4CAF50; }\n";
+        std::cout << ".form-group { margin-bottom: 20px; }\n";
+        std::cout << "label { display: block; margin-bottom: 5px; color: #4CAF50; font-weight: bold; }\n";
+        std::cout << "input, select { width: 100%; padding: 12px; border: 1px solid #333; background: #2a2a2a; color: #fff; border-radius: 6px; box-sizing: border-box; }\n";
+        std::cout << "button { background: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; margin: 5px; }\n";
+        std::cout << "button:hover { background: #45a049; }\n";
+        std::cout << ".result { background: rgba(76,175,80,0.2); padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center; }\n";
+        std::cout << ".calculation { font-size: 1.2em; margin-bottom: 10px; }\n";
+        std::cout << ".answer { font-size: 2em; font-weight: bold; color: #4CAF50; }\n";
+        std::cout << ".forms { display: flex; gap: 20px; flex-wrap: wrap; }\n";
+        std::cout << ".form-section { flex: 1; min-width: 250px; background: rgba(255,255,255,0.02); padding: 20px; border-radius: 10px; }\n";
+        std::cout << "h3 { color: #4CAF50; margin-top: 0; }\n";
+        std::cout << "</style>\n</head>\n<body>\n";
+        
+        std::cout << "<div class='container'>\n";
+        std::cout << "<h1>🧮 Calculator - GET/POST Demo</h1>\n";
+        
+        // Show current request method
+        std::cout << "<div class='method-info'>\n";
+        std::cout << "<strong>Current Request Method:</strong> " << request_method << "\n";
+        if (!params.empty()) {
+            std::cout << "<br><strong>Parameters received:</strong> ";
+            for (const auto& param : params) {
+                std::cout << param.first << "=" << param.second << " ";
+            }
+        }
+        std::cout << "</div>\n";
 
-        std::string filepath = save_uploaded_file();
-        if (filepath.empty()) {
-            std::cout << "<div class='card'><h2>Upload Image</h2>";
-            std::cout << "<form method='POST' enctype='multipart/form-data'>";
-            std::cout << "<input type='file' name='file'><br><br>";
-            std::cout << "<button type='submit'>Upload</button></form></div>";
-        } else {
-            struct stat st;
-            stat(filepath.c_str(), &st);
-            ImageInfo img;
-            img.name = filepath.substr(filepath.find_last_of("/") + 1);
-            img.size = st.st_size;
-            img.type = get_extension(img.name);
-            img.mime_type = get_mime_type(img.type);
-            img.dimensions = get_image_dimensions(filepath);
-            img.aspect_ratio = get_aspect_ratio(filepath);
-            img.bit_depth = get_bit_depth(filepath);
-            img.compression = get_compression_info(filepath);
-            img.file_signature = get_file_signature(filepath);
-            img.checksum = calculate_checksum(filepath);
-            img.file_permissions = get_file_permissions(filepath);
+        // Show calculation result if parameters exist
+        if (params.find("num1") != params.end() && 
+            params.find("num2") != params.end() && 
+            params.find("operation") != params.end()) {
             
-            char time_str[32];
-            strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime(&st.st_mtime));
-            img.modified = time_str;
-            strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime(&st.st_ctime));
-            img.created = time_str;
+            double num1 = atof(params["num1"].c_str());
+            double num2 = atof(params["num2"].c_str());
+            std::string operation = params["operation"];
+            double result = calculate(operation, num1, num2);
             
-            img.color_info = analyze_colors(filepath);
-            img.dominant_colors = get_dominant_colors(filepath);
-            img.brightness_info = get_brightness_info(filepath);
-            
-            // Fix preview path - use web-accessible path
-            std::string web_path = web_upload_dir + img.name;
-
-            std::cout << "<div class='card'><h2>📸 Uploaded Image</h2>";
-            std::cout << "<img src='" << web_path << "' class='image-preview' alt='Uploaded image'>";
-            std::cout << "<p><strong>Preview:</strong> " << img.name << "</p></div>";
-
-            std::cout << "<div class='card'><h2>📋 Complete Image Metadata</h2><table>";
-            std::cout << "<tr><th>📁 Filename</th><td>" << img.name << "</td></tr>";
-            std::cout << "<tr><th>🏷️ File Type</th><td>" << img.type.empty() ? "Unknown" : img.type << "</td></tr>";
-            std::cout << "<tr><th>📄 MIME Type</th><td>" << img.mime_type << "</td></tr>";
-            std::cout << "<tr><th>📏 File Size</th><td>" << format_size(img.size) << " (" << img.size << " bytes)</td></tr>";
-            std::cout << "<tr><th>📐 Dimensions</th><td>" << img.dimensions << "</td></tr>";
-            std::cout << "<tr><th>📊 Aspect Ratio</th><td>" << img.aspect_ratio << "</td></tr>";
-            std::cout << "<tr><th>🎨 Bit Depth</th><td>" << img.bit_depth << "</td></tr>";
-            std::cout << "<tr><th>🗜️ Compression</th><td>" << img.compression << "</td></tr>";
-            std::cout << "<tr><th>🔍 File Signature</th><td><code>" << img.file_signature << "</code></td></tr>";
-            std::cout << "<tr><th>🔐 Checksum</th><td><code>" << img.checksum << "</code></td></tr>";
-            std::cout << "<tr><th>🔒 Permissions</th><td>" << img.file_permissions << "</td></tr>";
-            std::cout << "<tr><th>📅 Created</th><td>" << img.created << "</td></tr>";
-            std::cout << "<tr><th>📝 Modified</th><td>" << img.modified << "</td></tr>";
-            std::cout << "</table></div>";
-
-            std::cout << "<div class='card'><h2>🎨 Color Analysis</h2><table>";
-            std::cout << "<tr><th>🔍 Color Analysis</th><td>" << img.color_info << "</td></tr>";
-            std::cout << "<tr><th>🎯 Dominant Colors</th><td>" << img.dominant_colors << "</td></tr>";
-            std::cout << "<tr><th>💡 Brightness</th><td>" << img.brightness_info << "</td></tr>";
-            std::cout << "</table></div>";
-
-            // Add cleanup option
-            std::cout << "<div class='card'><h2>🗑️ File Management</h2>";
-            std::cout << "<p><strong>Note:</strong> Uploaded files are stored temporarily. ";
-            std::cout << "File location: <code>" << filepath << "</code></p>";
-            std::cout << "<p><em>Files may be automatically cleaned up after some time.</em></p>";
-            std::cout << "</div>";
+            std::cout << "<div class='result'>\n";
+            std::cout << "<div class='calculation'>" << num1 << " " << getOperationSymbol(operation) << " " << num2 << " =</div>\n";
+            std::cout << "<div class='answer'>" << result << "</div>\n";
+            std::cout << "<p><em>Calculated using " << request_method << " method</em></p>\n";
+            std::cout << "</div>\n";
         }
 
-        std::cout << "</div></body></html>";
+        // Forms section
+        std::cout << "<div class='forms'>\n";
+        
+        // GET form
+        std::cout << "<div class='form-section'>\n";
+        std::cout << "<h3>📤 GET Method</h3>\n";
+        std::cout << "<p>Parameters visible in URL</p>\n";
+        std::cout << "<form method='GET'>\n";
+        std::cout << "<div class='form-group'>\n";
+        std::cout << "<label>First Number:</label>\n";
+        std::cout << "<input type='number' name='num1' step='any' value='" << (params.find("num1") != params.end() ? params["num1"] : "") << "' required>\n";
+        std::cout << "</div>\n";
+        std::cout << "<div class='form-group'>\n";
+        std::cout << "<label>Operation:</label>\n";
+        std::cout << "<select name='operation'>\n";
+        std::string current_op = params.find("operation") != params.end() ? params["operation"] : "";
+        std::cout << "<option value='add'" << (current_op == "add" ? " selected" : "") << ">Addition (+)</option>\n";
+        std::cout << "<option value='subtract'" << (current_op == "subtract" ? " selected" : "") << ">Subtraction (-)</option>\n";
+        std::cout << "<option value='multiply'" << (current_op == "multiply" ? " selected" : "") << ">Multiplication (×)</option>\n";
+        std::cout << "<option value='divide'" << (current_op == "divide" ? " selected" : "") << ">Division (÷)</option>\n";
+        std::cout << "<option value='power'" << (current_op == "power" ? " selected" : "") << ">Power (^)</option>\n";
+        std::cout << "<option value='modulo'" << (current_op == "modulo" ? " selected" : "") << ">Modulo (%)</option>\n";
+        std::cout << "</select>\n";
+        std::cout << "</div>\n";
+        std::cout << "<div class='form-group'>\n";
+        std::cout << "<label>Second Number:</label>\n";
+        std::cout << "<input type='number' name='num2' step='any' value='" << (params.find("num2") != params.end() ? params["num2"] : "") << "' required>\n";
+        std::cout << "</div>\n";
+        std::cout << "<button type='submit'>Calculate with GET</button>\n";
+        std::cout << "</form>\n";
+        std::cout << "</div>\n";
+        
+        // POST form
+        std::cout << "<div class='form-section'>\n";
+        std::cout << "<h3>📥 POST Method</h3>\n";
+        std::cout << "<p>Parameters hidden in request body</p>\n";
+        std::cout << "<form method='POST'>\n";
+        std::cout << "<div class='form-group'>\n";
+        std::cout << "<label>First Number:</label>\n";
+        std::cout << "<input type='number' name='num1' step='any' value='" << (params.find("num1") != params.end() ? params["num1"] : "") << "' required>\n";
+        std::cout << "</div>\n";
+        std::cout << "<div class='form-group'>\n";
+        std::cout << "<label>Operation:</label>\n";
+        std::cout << "<select name='operation'>\n";
+        std::cout << "<option value='add'" << (current_op == "add" ? " selected" : "") << ">Addition (+)</option>\n";
+        std::cout << "<option value='subtract'" << (current_op == "subtract" ? " selected" : "") << ">Subtraction (-)</option>\n";
+        std::cout << "<option value='multiply'" << (current_op == "multiply" ? " selected" : "") << ">Multiplication (×)</option>\n";
+        std::cout << "<option value='divide'" << (current_op == "divide" ? " selected" : "") << ">Division (÷)</option>\n";
+        std::cout << "<option value='power'" << (current_op == "power" ? " selected" : "") << ">Power (^)</option>\n";
+        std::cout << "<option value='modulo'" << (current_op == "modulo" ? " selected" : "") << ">Modulo (%)</option>\n";
+        std::cout << "</select>\n";
+        std::cout << "</div>\n";
+        std::cout << "<div class='form-group'>\n";
+        std::cout << "<label>Second Number:</label>\n";
+        std::cout << "<input type='number' name='num2' step='any' value='" << (params.find("num2") != params.end() ? params["num2"] : "") << "' required>\n";
+        std::cout << "</div>\n";
+        std::cout << "<button type='submit'>Calculate with POST</button>\n";
+        std::cout << "</form>\n";
+        std::cout << "</div>\n";
+        
+        std::cout << "</div>\n"; // end forms
+        
+        // Debug info
+        std::cout << "<div style='margin-top: 30px; padding: 15px; background: rgba(255,255,255,0.02); border-radius: 8px; font-size: 0.9em;'>\n";
+        std::cout << "<h4>🔧 Debug Information</h4>\n";
+        std::cout << "<p><strong>Request Method:</strong> " << request_method << "</p>\n";
+        
+        char* query_string = getenv("QUERY_STRING");
+        if (query_string && strlen(query_string) > 0) {
+            std::cout << "<p><strong>Query String:</strong> " << query_string << "</p>\n";
+        }
+        
+        char* content_type = getenv("CONTENT_TYPE");
+        if (content_type) {
+            std::cout << "<p><strong>Content Type:</strong> " << content_type << "</p>\n";
+        }
+        
+        char* content_length = getenv("CONTENT_LENGTH");
+        if (content_length) {
+            std::cout << "<p><strong>Content Length:</strong> " << content_length << "</p>\n";
+        }
+        
+        std::cout << "</div>\n";
+        
+        std::cout << "</div>\n</body>\n</html>\n";
     }
 };
 
 int main() {
-    ImageProcessor processor;
-    processor.generate_html();
+    Calculator calc;
+    calc.generateHTML();
     return 0;
 }
