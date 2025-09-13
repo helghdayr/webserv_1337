@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/21 20:57:28 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/09/13 19:44:25 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/13 20:59:47 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -211,7 +211,7 @@ void	SetupServers::RemoveSocketFromEpoll(int fd, int job)
 
 void    SetupServers::WaitEpoll(void)
 {
-	number_events = epoll_wait(fd_epoll, events, MAX_EVENTS, 2000);
+	number_events = epoll_wait(fd_epoll, events, MAX_EVENTS, TIMEOFEPOLL);
 
 	if (number_events < 0)
 	{

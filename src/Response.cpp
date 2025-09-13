@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/09/13 20:18:27 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/13 21:43:41 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -212,7 +212,7 @@ void    Response::BuildGetResponse(void)
 	std::ostringstream  os;
 	os << info.st_size;
 
-	responseBody = "HTTP/1.1 " + oss.str() + " " + getStrState() + "\r\n";
+	responseBody = request.getVersion() + " " + oss.str() + " " + getStrState() + "\r\n";
 	responseBody += "Content-Type: " + MIME_Type() + "\r\n";
 	responseBody += "Content-Length: " + os.str() + "\r\n";
 	addCookiesToHeaders();
@@ -303,7 +303,7 @@ void    Response::BuildDeleteResponse(void)
 	if (unlink(path.c_str()) == -1)
 		return (SetState(Internal_Server_Error), ResponseWithError(NONE));
 
-	responseBody = "HTTP/1.1 204 No Content\r\n";
+	responseBody = request.getVersion() + " 204 No Content\r\n";
 	responseBody += "Content-Length: 0\r\n";
 	responseBody += "Connection: close\r\n\r\n";
 }
@@ -340,7 +340,7 @@ void    Response::BuildPostResponse(void)
 	os << getState();
 	std::string body = "<html><body><h1>Upload Successful</h1></body></html>";
 	oss << body.size();
-	std::string headers = "HTTP/1.1 " + os.str() + " " + getStrState() + "\r\n";
+	std::string headers = request.getVersion() + " " + os.str() + " " + getStrState() + "\r\n";
 	headers += "Content-Type: text/html\r\n";
 	headers += "Content-Length: " + oss.str() + "\r\n";
 	headers += "Connection: close\r\n\r\n";
@@ -658,7 +658,7 @@ void	Response::handleCgiRequest(ParseRequest& request)
 
 void	Response::sendCgiResponse(const CgiResult& cgi_result)
 {
-	responseBody = "HTTP/1.1 " + intToString(cgi_result.status_code) + " OK\r\n";
+	responseBody = request.getVersion() + " " + intToString(cgi_result.status_code) + " OK\r\n";
 	
 	responseBody += cgi_result.headers;
 	
