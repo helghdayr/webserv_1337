@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/27 16:27:01 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/13 20:18:27 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -313,9 +313,20 @@ void    Response::DeleteContentResponse(void)
 	struct stat info;
 
 	if (stat(path.c_str(), &info) == -1)
-		return (SetState(Not_Found), ResponseWithError(NONE));
+	{
+		if (errno == ENOENT)
+			return (SetState(Not_Found), ResponseWithError(NONE));
+		return (SetState(Internal_Server_Error), ResponseWithError(NONE));
+	}
 
-	if (S_ISDIR(info.st_mode) || access(path.c_str(), W_OK) != 0)
+	size_t	pos = path.rfind('/');
+
+	if (S_ISDIR(info.st_mode) || pos == std::string::npos)
+		return (SetState(Forbidden), ResponseWithError(NONE));
+
+	std::string	dir_path = path.substr(0, pos);
+
+	if (access(dir_path.c_str(), W_OK | X_OK) != 0)
 		return (SetState(Forbidden), ResponseWithError(NONE));
 
 	BuildDeleteResponse();

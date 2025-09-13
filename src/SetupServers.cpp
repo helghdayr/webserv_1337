@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/21 20:57:28 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/27 14:55:12 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/13 19:44:25 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -114,11 +114,16 @@ void    SetupServers::setAddrForBound(std::string& host, std::string& port, stru
 {
 
 	uint16_t            port_number = std::atoi(port.c_str());
+	int	a,b,c,d;
+	char	dot;
+
+	std::istringstream	oss(host);
+	oss >> a >> dot >> b >> dot >> c >> dot >> d;
 
 	std::memset(&add_server, 0, sizeof(add_server));
 	add_server.sin_family = AF_INET;
 	add_server.sin_port = htons(port_number);
-	add_server.sin_addr.s_addr = inet_addr(host.c_str());
+	add_server.sin_addr.s_addr = htonl((a << 24) | (b << 16) | (c << 8) | d);
 }
 
 void    SetupServers::Binding(Server& server, size_t index)
