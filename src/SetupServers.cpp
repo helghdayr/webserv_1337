@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/21 20:57:28 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/27 14:55:12 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/13 20:59:47 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -114,11 +114,16 @@ void    SetupServers::setAddrForBound(std::string& host, std::string& port, stru
 {
 
 	uint16_t            port_number = std::atoi(port.c_str());
+	int	a,b,c,d;
+	char	dot;
+
+	std::istringstream	oss(host);
+	oss >> a >> dot >> b >> dot >> c >> dot >> d;
 
 	std::memset(&add_server, 0, sizeof(add_server));
 	add_server.sin_family = AF_INET;
 	add_server.sin_port = htons(port_number);
-	add_server.sin_addr.s_addr = inet_addr(host.c_str());
+	add_server.sin_addr.s_addr = htonl((a << 24) | (b << 16) | (c << 8) | d);
 }
 
 void    SetupServers::Binding(Server& server, size_t index)
@@ -206,7 +211,7 @@ void	SetupServers::RemoveSocketFromEpoll(int fd, int job)
 
 void    SetupServers::WaitEpoll(void)
 {
-	number_events = epoll_wait(fd_epoll, events, MAX_EVENTS, 2000);
+	number_events = epoll_wait(fd_epoll, events, MAX_EVENTS, TIMEOFEPOLL);
 
 	if (number_events < 0)
 	{
@@ -304,9 +309,9 @@ void    SetupServers::Run(void)
 			{
 				if (fd_sockets.begin() + endpoints != find(fd_sockets.begin(), fd_sockets.begin() + endpoints, fd))
 				{
-					Requests[fd].setTimeConnection(time(NULL));
 					AcceptConnection(fd);
 					AddSocketToEpoll(fd_sockets.back(), EPOLLIN, EPOLL_CTL_ADD);
+					Requests[fd_sockets.back()].setTimeConnection(std::time(NULL));
 				}
 				else
 				{	
@@ -359,8 +364,8 @@ void    SetupServers::Run(void)
 
 				if (!block_serv)
 					block_serv = GetBlockServer(fd);
-
-				if (static_cast<long> (time(NULL) - Requests[fd].getTimeConnection()) >= block_serv->getHeaderTimeout())
+				long time = std::time(NULL) - Requests[fd].getTimeConnection();
+				if (time >= block_serv->getHeaderTimeout())
 				{
 					Responses[fd].SetState(Request_Timeout);
 					Responses[fd].ResponseWithError(DEFAULT);
@@ -398,7 +403,9 @@ void    SetupServers::StartSetup(void)
 				index++;
 			}
 		}
-		catch (...){}
+		catch (const std::exception& error){
+			std::cout << error.what();
+		}
 	}
 
 	if (sock_number == 0)

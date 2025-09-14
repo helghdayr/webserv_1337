@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/27 16:27:01 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/13 21:43:41 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -212,7 +212,7 @@ void    Response::BuildGetResponse(void)
 	std::ostringstream  os;
 	os << info.st_size;
 
-	responseBody = "HTTP/1.1 " + oss.str() + " " + getStrState() + "\r\n";
+	responseBody = Request.getVersion() + " " + oss.str() + " " + getStrState() + "\r\n";
 	responseBody += "Content-Type: " + MIME_Type() + "\r\n";
 	responseBody += "Content-Length: " + os.str() + "\r\n";
 	addCookiesToHeaders();
@@ -261,7 +261,7 @@ bool    Response::ReturnDirective(void)
 	if (code == 301 || code == 302 || code == 303
 		|| code == 307 || code == 308)
 	{
-		responseBody = "HTTP/1.1 " + statuscode.str() + " " + getStrState() + "\r\n";
+		responseBody = Request.getVersion() + " " + statuscode.str() + " " + getStrState() + "\r\n";
 		responseBody += "Location: " + redirecturl + "\r\n";
 		responseBody += "Content-Length: 0\r\n";
 		responseBody += "Connection: close\r\n\r\n";
@@ -272,7 +272,7 @@ bool    Response::ReturnDirective(void)
 		std::ostringstream  os;
 		os << body.size();
 
-		responseBody = "HTTP/1.1 " + statuscode.str() + " " + getStrState() + "\r\n";
+		responseBody = Request.getVersion() + " " + statuscode.str() + " " + getStrState() + "\r\n";
 		responseBody += "Content-Length: " + os.str() + "\r\n";
 		responseBody += "Connection: close\r\n\r\n";
 		responseBody += body;
@@ -303,7 +303,7 @@ void    Response::BuildDeleteResponse(void)
 	if (unlink(path.c_str()) == -1)
 		return (SetState(Internal_Server_Error), ResponseWithError(NONE));
 
-	responseBody = "HTTP/1.1 204 No Content\r\n";
+	responseBody = Request.getVersion() + " 204 No Content\r\n";
 	responseBody += "Content-Length: 0\r\n";
 	responseBody += "Connection: close\r\n\r\n";
 }
@@ -313,9 +313,20 @@ void    Response::DeleteContentResponse(void)
 	struct stat info;
 
 	if (stat(path.c_str(), &info) == -1)
-		return (SetState(Not_Found), ResponseWithError(NONE));
+	{
+		if (errno == ENOENT)
+			return (SetState(Not_Found), ResponseWithError(NONE));
+		return (SetState(Internal_Server_Error), ResponseWithError(NONE));
+	}
 
-	if (S_ISDIR(info.st_mode) || access(path.c_str(), W_OK) != 0)
+	size_t	pos = path.rfind('/');
+
+	if (S_ISDIR(info.st_mode) || pos == std::string::npos)
+		return (SetState(Forbidden), ResponseWithError(NONE));
+
+	std::string	dir_path = path.substr(0, pos);
+
+	if (access(dir_path.c_str(), W_OK | X_OK) != 0)
 		return (SetState(Forbidden), ResponseWithError(NONE));
 
 	BuildDeleteResponse();
@@ -329,7 +340,7 @@ void    Response::BuildPostResponse(void)
 	os << getState();
 	std::string body = "<html><body><h1>Upload Successful</h1></body></html>";
 	oss << body.size();
-	std::string headers = "HTTP/1.1 " + os.str() + " " + getStrState() + "\r\n";
+	std::string headers = Request.getVersion() + " " + os.str() + " " + getStrState() + "\r\n";
 	headers += "Content-Type: text/html\r\n";
 	headers += "Content-Length: " + oss.str() + "\r\n";
 	headers += "Connection: close\r\n\r\n";
@@ -344,7 +355,6 @@ bool	Response::MultiPart(std::string body)
 	size_t pos = body.find("Content-Disposition:");
 	ignore = false;
 
-	std::cout << "path === " << path << "\n";
 	if (pos != std::string::npos)
 	{
 		size_t end = body.find('\n', pos);
@@ -614,21 +624,21 @@ void	Response::handleCgiRequest(ParseRequest& request)
 	{
 		Location* location = this->location;
 		if (!location)
-			return (SetState(404), ResponseWithError(NONE));
+			return (SetState(Not_Found), ResponseWithError(NONE));
 		
 		if (!location->isCgiRequest(request.getUri()))
-			return (SetState(404), ResponseWithError(NONE));
+			return (SetState(Not_Found), ResponseWithError(NONE));
 
 		std::string script_path = path;
 
 		if (script_path.empty() || access(script_path.c_str(), F_OK | R_OK) != 0)
-			return (SetState(404), ResponseWithError(NONE));
+			return (SetState(Not_Found), ResponseWithError(NONE));
 
 		std::string file_extension = getFileExtension(request.getUri());
 		std::string interpreter = location->getCgiInterpreter(file_extension);
 
 		if (interpreter.empty())
-			return (SetState(500), ResponseWithError(NONE));
+			return (SetState(Internal_Server_Error), ResponseWithError(NONE));
 
 		Cgi cgi(script_path, interpreter);
 		CgiResult result = cgi.execute(request);
@@ -647,7 +657,7 @@ void	Response::handleCgiRequest(ParseRequest& request)
 
 void	Response::sendCgiResponse(const CgiResult& cgi_result)
 {
-	responseBody = "HTTP/1.1 " + intToString(cgi_result.status_code) + " OK\r\n";
+	responseBody = Request.getVersion() + " " + intToString(cgi_result.status_code) + " OK\r\n";
 	
 	responseBody += cgi_result.headers;
 	

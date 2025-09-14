@@ -2,7 +2,7 @@
 
 # Configuration
 SERVER_HOST="localhost"
-SERVER_PORT="8004"
+SERVER_PORT="8003"
 ENDPOINT="/uploads"
 JSON_DATA='{"test": "data", "number": 12345}'
 

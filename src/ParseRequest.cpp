@@ -604,40 +604,13 @@ std::string&                                        ParseRequest::getQueryString
 
 std::string&                                        ParseRequest::getBufferBody()                    	{ return (RequestBufferbody);}
 
-time_t                                              ParseRequest::getTimeConnection()                   { return (Time); }
-
-// std::string                                			ParseRequest::getBufferBody_string()                { 
-
-// 	std::string ReqB(&RequestBufferbody[0], RequestBufferbody.size());	
-	
-// 	return (ReqB);
-
-// }
+std::time_t                                              ParseRequest::getTimeConnection()                   { return (Time); }
 
 size_t                                              ParseRequest::getContentLength()                	{ return (contentLength);}
 
 std::string&                                    ParseRequest::getBufferDecompressedBody()        	        { return (DecompressedBufferBody);}
 
-// std::string	                                		ParseRequest::getBufferDecompressedBody_string()    { 
-
-// 	std::string Decompresstring( &DecompressedBufferBody[0], DecompressedBufferBody.size());
-	
-// 	return (Decompresstring);
-
-// }
-
 std::vector<std::string >&                    ParseRequest::getMultipartBuferBody()            	{ return (MultipartBufferBody);}
-
-// std::vector<std::string >                    ParseRequest::getMultipartBuferBody_string()		{
-
-// 	std::vector<std::string > MultipartStr;
-	
-// 	for (std::vector<std::string >::iterator it = MultipartBufferBody.begin(); it != MultipartBufferBody.end();it++){
-// 		MultipartStr.push_back(std::string(it->begin(), it->end()));
-// 	}
-// 	return (MultipartStr);
-
-// }
 
 Server*                                                ParseRequest::getBlockServer()                     { return S; }
 
@@ -716,7 +689,7 @@ void ParseRequest::setErrorNumber(int Number, std::string ErrorMsg){
     std::cerr << RED << "ERROR: " << errorNumber << "  " << ErrorMsg << RESET << std::endl;
 }
 
-void ParseRequest::setTimeConnection(time_t time)               {Time = time;}
+void ParseRequest::setTimeConnection(std::time_t time)               {Time = time;}
 
 
 
@@ -1007,7 +980,6 @@ void ParseRequest::CheckingForBody(){
     if (chunkedEncoding)
         return SwitchState(READCHUNKSIZE);
 
-    // RequestBufferbody.resize(contentLength);
     SwitchState(CONTENTLENGTHBODY);
 
     CheckContentEncoding();
@@ -1166,7 +1138,7 @@ void        ParseRequest::startParse (int fd, const Config& config, Server* serv
             S = server;
         if (CurrntParsState <= ADD_HEADER)
             ReadingPhase = READING_HEADERS;
-        setTimeConnection(time(NULL));
+        setTimeConnection(std::time(NULL));
         ReadAndParseIntilHeadersFinish(Request_Buff, fd, config, server);
         if (CurrntParsState < PARSEARRAYSIZE)
             return ;
