@@ -14,7 +14,7 @@ echo "Sending DEFLATE compressed request to ${SERVER_HOST}:${SERVER_PORT}${ENDPO
 # Compress the JSON data using raw deflate
 echo "$JSON_DATA" | node -e "
 const zlib = require('zlib');
-process.stdin.pipe(zlib.createDeflateRaw()).pipe(process.stdout);
+process.stdin.pipe(zlib.createDeflate()).pipe(process.stdout);
 " > "$TEMP_FILE"
 
 # Get the content length
