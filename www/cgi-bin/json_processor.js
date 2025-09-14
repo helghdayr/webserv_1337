@@ -242,7 +242,7 @@ getPostedData((err, postedData, jsonText) => {
     }
     
     console.log("</div>");
-    console.log("<a href='/' class='back-btn'>Back to Home</a>");
+    console.log("<a href='/cgi-bin' class='back-btn'>Back to CGI Testing</a>");
     console.log("</div>");
     console.log("</body>");
     console.log("</html>");
