@@ -1,6 +1,9 @@
 #include "../inc/ParseDirective.hpp"
+#include <algorithm>
+#include <cctype>
 #include <clocale>
 #include <exception>
+#include <string>
 #include <utility>
 
 DirectiveParser::DirectiveParser(Lexer& lexer) : lexer(lexer) {}
@@ -55,7 +58,7 @@ Config* DirectiveParser::parseConfig()
 			{
 				Server* server = parseServerBlock();
 				if (server->getListen().empty())
-					server->setListen(std::make_pair("0.0.0.0", "8000"));
+					throw ParseException("Listen directive required", currentToken.line);
 				config->addServer(server);
 			}
 			else
@@ -165,6 +168,10 @@ void DirectiveParser::parseServerDirective(Server* server)
 		parseAllowMethodsServ(server, values);
 	else if (directive == "listen")
 		parseListen(server, values);
+	else if (directive == "client_timeout")
+		parseTimeout(server, values);
+	else if (directive == "client_header_timeout")
+		parseHeaderTimeout(server, values);
 	else if (directive == "server_name")
 		parseServerName(server, values);
 	else if (directive == "root")
@@ -273,13 +280,55 @@ void DirectiveParser::parseListen(Server* server, const std::vector<std::string>
 		server->setListen(std::make_pair(host, port));
 }
 
+void DirectiveParser::parseHeaderTimeout(Server* server, const std::vector<std::string>& values)
+{
+	if (values.size() != 1)
+		throw ParseException("client_header_timeout requires exactly one value", currentToken.line);
+
+	char*	end;
+	long	timeout = strtol(values[0].c_str(), &end, 10);
+
+	if (*end != '\0')
+		throw ParseException("Invalid client_header_timeout: " + values[0], currentToken.line);
+
+	if (timeout < 4 || timeout > 90)
+		throw ParseException("client_header_timeout must be > 4 and < 90 " + values[0], currentToken.line);
+
+	server->addHeaderTimeout(static_cast<size_t>(timeout));
+}
+
+void DirectiveParser::parseTimeout(Server* server, const std::vector<std::string>& values)
+{
+	if (values.size() != 1)
+		throw ParseException("client_timeout requires exactly one value", currentToken.line);
+
+	char*	end;
+	long	timeout = strtol(values[0].c_str(), &end, 10);
+
+	if (*end != '\0')
+		throw ParseException("Invalid client_timeout: " + values[0], currentToken.line);
+
+	if (timeout < 4)
+		throw ParseException("client_timeout minimum value is 4: " + values[0], currentToken.line);
+
+	server->addClientTimeout(static_cast<size_t>(timeout));
+}
+
+void	to_upper(std::string &str)
+{
+	for (size_t i = 0; i < str.length(); i++)
+		str[i] = std::toupper(str[i]);
+}
+
 void DirectiveParser::parseClientBodyLimit(Server* server,
 		Location* location, const std::vector<std::string>& values)
 {
-	if (values.size() != 1)
+	if (values.size() != 2 && values.size() != 1)
 		throw ParseException("client_max_body_size requires exactly one value", currentToken.line);
 
-	size_t limit = parseSize(values[0]);
+	std::string size_unit = values.size() == 1 ? "" : values[1];
+
+	size_t limit = parseSize(values[0], size_unit);
 
 	if (location)
 		location->setClientBodyLimit(limit);
@@ -312,8 +361,8 @@ void DirectiveParser::parseReturnLoc(Location *location, const std::vector<std::
 	if (values.size() < 1 || values.size() > 2)
 		throw ParseException("return directive must have 1 or 2 values", currentToken.line);
 
-	int code = atoi(values[0].c_str());
-	if (code != 301 && code != 302 && code != 307)
+	int code = std::atoi(values[0].c_str());
+	if (code != 301 && code != 302 && code != 303 && code != 307 && code != 308)
 		throw ParseException("Invalid HTTP status code", currentToken.line);
 
 	ReturnDirective	return_d;
@@ -329,7 +378,7 @@ void DirectiveParser::parseReturn(Server* server, const std::vector<std::string>
 	if (values.size() < 1 || values.size() > 2)
 		throw ParseException("return directive must have 1 or 2 values", currentToken.line);
 
-	int code = atoi(values[0].c_str());
+	int code = std::atoi(values[0].c_str());
 	if (code < 100 || code > 599)
 		throw ParseException("Invalid HTTP status code", currentToken.line);
 
@@ -346,7 +395,7 @@ void DirectiveParser::parseErrorPage(Server* server, const std::vector<std::stri
 	if (values.size() < 2)
 		throw ParseException("error_page directive requires at least two values", currentToken.line);
 
-	int code = atoi(values[0].c_str());
+	int code = std::atoi(values[0].c_str());
 	if (code < 400 || code > 599)
 		throw ParseException("Invalid error code (must be 4xx or 5xx)", currentToken.line);
 
@@ -394,7 +443,13 @@ void DirectiveParser::parseCgiInfo(Location* location, const std::vector<std::st
 	if (values.size() != 2)
 		throw ParseException("cgi_info directive requires exactly two values (extension and interpreter)", currentToken.line);
 
-	location->setCgiExtension(values[0], values[1]);
+	std::string	extension = values[0];
+	std::string	interpreter = values[1];
+
+	if (extension[0] != '.')
+		extension = "." + extension;
+
+	location->setCgiExtension(extension, interpreter);
 }
 
 void DirectiveParser::parseUploadStore(Location* location, const std::vector<std::string>& values)
@@ -442,21 +497,19 @@ std::vector<std::string> DirectiveParser::gatherDirectiveValues()
 	return values;
 }
 
-size_t DirectiveParser::parseSize(const std::string& sizeStr)
+size_t DirectiveParser::parseSize(const std::string& sizeStr, std::string size_unit)
 {
 	char* end;
 	long size = strtol(sizeStr.c_str(), &end, 10);
 
-	if (*end != '\0')
+	if (!size_unit.empty())
 	{
-		char unit = std::toupper(*end);
-		switch (unit)
-		{
-			case 'K': size *= 1024; break;
-			case 'M': size *= 1024 * 1024; break;
-			case 'G': size *= 1024 * 1024 * 1024; break;
-			default: throw ParseException("Invalid size unit: " + sizeStr, currentToken.line);
-		}
+		to_upper(size_unit);
+		if (size_unit == "KB") size *= 1024;
+		else if (size_unit == "MB") size *= 1024 * 1024;
+		else if (size_unit == "GB") size *= 1024 * 1024 * 1024;
+		else
+			throw ParseException("client_max_body_size Invalid size unit", currentToken.line);
 	}
 
 	if (size <= 0)

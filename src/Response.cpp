@@ -6,687 +6,722 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/06/23 21:41:00 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/13 21:43:41 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../inc/Response.hpp"
 
-Response::Response(){}
+Response::Response() : sessionManager(NULL), responseBody(""), buildRes(false), bytes(0){}
 
-Response::~Response(){}   
+Response::~Response(){}
 
-void    Response::CheckLocations(std::string& path)
+void    Response::GetFullPath(std::string& path)
 {
-    std::vector<Location*>  locations = ServerBlock.getLocations();
-    std::string urlpath = path;
+	if (location)
+	{
+		std::string	loc_path = location->getPath();
+		std::string	temp_path = path.substr(loc_path.size());
+		
+		if (temp_path[0] == '/')
+			temp_path = temp_path.erase(0, 1);
 
-	while (true){
-		size_t i = 0;
-		while (i < locations.size()){
-			if (locations[i]->getPath() == urlpath)
-				return (FromLocation = true, SetLocation(*(locations[i])));
-			i++;
-		}
-		if (urlpath != "/" && urlpath.size() > 1){
-			if (urlpath[urlpath.size() - 1] == '/')
-				urlpath.erase(urlpath.find_last_of('/'));
-			urlpath = urlpath.erase(urlpath.find_last_of('/')+1);
-		}
-        else if (urlpath == "/") {
-			while (i < locations.size()){
-			if (locations[i]->getPath() == "/")
-				return (FromLocation = true, SetLocation(*(locations[i])));
-			}
-		}
-		else
-			break;
+		if (!location->getRoot().empty())
+			SetPath(location->getRoot() + temp_path);
+
+		else if (!ServerBlock.getRoot().empty())
+			SetPath(ServerBlock.getRoot() + path.erase(0, 1));
 	}
-    FromLocation = false;
-}
 
-bool    Response::GetFullPath(std::string& path)
-{
-    if (FromLocation == true)
-    {    
-        if (!location.getRoot().empty())
-        {
-            if (state_path == NORMAL)
-                path.erase(0, location.getPath().size());
-            if (path[0] == '/')
-                path.erase(0, 1);
-            SetPath(location.getRoot() + path);
-        }
-        else if (!ServerBlock.getRoot().empty())
-            SetPath(ServerBlock.getRoot() + path.erase(0, 1));
-        else
-            return (SetState(Internal_Server_Error),
-                ResponseWithError(DEFAULT), false);
-    }
-    else
-        SetPath(ServerBlock.getRoot() + path.erase(0, 1));
+	else
+	{
+		if (path[0] != '/')
+			return SetPath(ServerBlock.getRoot() + path);
 
-    return (true);
+		SetPath(ServerBlock.getRoot() + path.erase(0, 1));
+	}
 }
 
 bool    Response::CheckAutoIndex(void)
 {
-    if (FromLocation == true)
-        return (location.getAutoindex());
+	if (location)
+		return (location->getAutoindex());
 
-    return (ServerBlock.getAutoindex());
+	return (ServerBlock.getAutoindex());
 }
 
 void    Response::CheckIndexAccess(std::vector<std::string> indexs)
 {
-    for (size_t i(0); i < indexs.size(); i++)
-    {
-        std::string join = path + indexs[i];
+	bool found = false;
 
-        if (access(join.c_str(), F_OK) == 0)
-        {
-            SetPath(join);
-            break ;
-        }
-        else if (i + 1 == indexs.size())
-            return (SetState(Forbidden), ResponseWithError(NONE));
-    }
+	for (size_t i(0); i < indexs.size(); i++)
+	{
+		if (path[path.size() - 1] != '/')
+			path += "/";
 
-    fd = open(path.c_str(), O_RDONLY);
+		std::string	join = path + indexs[i];
 
-    if (fd == -1)
-        return (SetState(Internal_Server_Error), ResponseWithError(NONE));
-    
-    BuildGetResponse();
-}
+		if (access(join.c_str(), F_OK) == 0)
+		{
+			SetPath(join);
+			found = true;
+			break;
+		}
+	}
 
-void    Response::GetListingPage(void)
-{
-    DIR *dir = opendir(path.c_str());
-    int file = open("./error_pages/template.html", O_RDONLY);
-    fd = open("./error_pages/listening_page.html", O_RDWR | O_TRUNC);
+	if (found)
+		BuildGetResponse();
 
-    if (!dir || file == -1 || fd == -1)
-    {
-        state = Forbidden;
-        ResponseWithError(NONE);
-        return ;
-    }
-    struct dirent *entry;
+	else if (CheckAutoIndex() == ON)
+		GetListingPage();
 
-    char buff[500];
-    int bytes = read(file, buff, sizeof(buff));
-    write (fd, buff, bytes);
-    buff[bytes] = 0;
-    close(file);
-    
-    std::ostringstream  os;
-    while ((entry = readdir(dir)) != NULL)
-    {
-        std::string value = entry->d_name;
-        
-        if (value == "." || value == "..")
-            continue;
-            
-        if (entry->d_type == DT_DIR)
-            value = "/" + value;
-
-        os << "    <li><a href=\"" + value + "\">" + value + "</a></li>\n";
-    }
-    os << "  </ul>\n  <hr>\n</body>\n</html>";
-    closedir (dir);
-    write (fd, os.str().c_str(), os.str().size());
-    close(fd);
-    SetPath("./error_pages/listening_page.html");
-    BuildGetResponse();
+	else
+		SetState(Forbidden), ResponseWithError(NONE);
 }
 
 void    Response::SearchForIndex(void)
 {
-    if (FromLocation == true)
-    {
-        if (location.getIndex().empty() && CheckAutoIndex() == ON)
-            GetListingPage();
+	if (location)
+	{
+		if (!location->getIndex().empty())
+			CheckIndexAccess(location->getIndex());
 
-        else if (location.getIndex().empty())
-            return (SetState(Forbidden), ResponseWithError(NONE));
+		else if (CheckAutoIndex() == ON)
+			GetListingPage();
 
-        else
-            CheckIndexAccess(location.getIndex());
-    }
-    else
-    {
-        if (ServerBlock.getIndex().empty() && CheckAutoIndex() == ON)
-            GetListingPage();
+		else
+			return (SetState(Forbidden), ResponseWithError(NONE));
+	}
+	else
+	{
+		if (!ServerBlock.getIndex().empty())
+			CheckIndexAccess(ServerBlock.getIndex());
 
-        else if (ServerBlock.getIndex().empty())
-            return (SetState(Forbidden), ResponseWithError(NONE));
+		else if (CheckAutoIndex() == ON)
+			GetListingPage();
 
-        else
-            CheckIndexAccess(ServerBlock.getIndex());
-    }
+		else
+			return (SetState(Forbidden), ResponseWithError(NONE));
+	}
 }
 
 std::string Response::getStrState(void) const
 {
-    switch (getState())
-    {
-        case Created:
-            return ("Created");
-        case Bad_Request:
-            return ("Bad Request");
-        case Forbidden:
-            return ("Forbidden");
-        case Not_Found:
-            return ("Not Found");
-        case Method_Not_Allowed:
-            return ("Method Not Allowed");
-        case Content_Too_Large:
-            return ("Content Too Large");
-        case URI_Too_Long:
-            return ("URI Too Long");
-        case Request_Header_Fields_Too_Large:
-            return ("Request Header Fields Too Large");
-        case Internal_Server_Error:
-            return ("Internal Server Error");
-        case Not_Implemented:
-            return ("Not Implemented");
-        case HTTP_Version_Not_Supported:
-            return ("HTTP Version Not Supported");
-        default:
-            return ("OK");
-    }
+	switch (getState())
+	{
+		case Created:
+			return ("Created");
+		case Moved_Permanently:
+			return ("Moved Permanently");
+		case Found:
+			return ("Found");
+		case See_Other:
+			return ("See Other");
+		case Temporary:
+			return ("Temporary");
+		case Permanent_Redirect:
+			return ("Permanent Redirect");
+		case Bad_Request:
+			return ("Bad Request");
+		case Forbidden:
+			return ("Forbidden");
+		case Not_Found:
+			return ("Not Found");
+		case Method_Not_Allowed:
+			return ("Method Not Allowed");
+		case Content_Too_Large:
+			return ("Content Too Large");
+		case URI_Too_Long:
+			return ("URI Too Long");
+		case Request_Header_Fields_Too_Large:
+			return ("Request Header Fields Too Large");
+		case Request_Timeout:
+			return ("Request Timeout");
+		case Internal_Server_Error:
+			return ("Internal Server Error");
+		case Not_Implemented:
+			return ("Not Implemented");
+		case HTTP_Version_Not_Supported:
+			return ("HTTP Version Not Supported");
+		case Bad_Gateway:
+			return ("Bad Gateway");
+		case Gateway_Timeout:
+			return ("Gateway Timeout");
+		case Unsupported_Media_Type:
+			return ("Unsupported Media Type");
+		case Conflict:
+			return ("Conflict");
+		case Length_Required:
+			return ("Length Required");
+		default:
+			return ("OK");
+	}
 }
 
 std::string Response::MIME_Type(void) const
 {
-    size_t  pos = path.rfind('.');
+	size_t  pos = path.rfind('.');
 
-    if (pos == std::string::npos)
-        return ("application/octet-stream");
+	if (pos == std::string::npos)
+		return ("application/octet-stream");
 
-    std::string extenstion = path.substr(pos + 1);
+	std::string extenstion = path.substr(pos + 1);
 
-    if (extenstion == html || extenstion == htm)
-        return ("text/html");
-    else if (extenstion == css)
-        return ("text/css");
-    else if (extenstion == js)
-        return ("application/javascript");
-    else if (extenstion == json || extenstion == pdf || extenstion == zip
-        || extenstion == xml)
-        return ("application/" + extenstion);
-    else if (extenstion == txt)
-        return ("text/plain");
-    else if (extenstion == jpg || extenstion == jpeg)
-        return ("image/jpeg");
-    else if (extenstion == png || extenstion == gif)
-        return ("image/" + extenstion);
-    else if (extenstion == svg)
-        return ("image/svg+xml");
-    else if (extenstion == ico)
-        return ("image/x-icon");
-    else if (extenstion == ogg)
-        return ("audio/ogg");
-    else if (extenstion == mp3)
-        return ("audio/mpeg");
-    else if (extenstion == woff || extenstion == woff2 || extenstion == ttf)
-        return ("font/" + extenstion);
-    else if (extenstion == eot)
-        return ("application/vnd.ms-fontobject");
-    else if (extenstion == mp4 || extenstion == webm)
-        return ("video/" + extenstion);
-    return ("application/octet-stream");
+	if (extenstion == html || extenstion == htm)
+		return ("text/html");
+	else if (extenstion == css)
+		return ("text/css");
+	else if (extenstion == js)
+		return ("application/javascript");
+	else if (extenstion == json || extenstion == pdf || extenstion == zip
+			|| extenstion == xml)
+		return ("application/" + extenstion);
+	else if (extenstion == txt)
+		return ("text/plain");
+	else if (extenstion == jpg || extenstion == jpeg)
+		return ("image/jpeg");
+	else if (extenstion == png || extenstion == gif)
+		return ("image/" + extenstion);
+	else if (extenstion == svg)
+		return ("image/svg+xml");
+	else if (extenstion == ico)
+		return ("image/x-icon");
+	else if (extenstion == ogg)
+		return ("audio/ogg");
+	else if (extenstion == mp3)
+		return ("audio/mpeg");
+	else if (extenstion == woff || extenstion == woff2 || extenstion == ttf)
+		return ("font/" + extenstion);
+	else if (extenstion == eot)
+		return ("application/vnd.ms-fontobject");
+	else if (extenstion == mp4 || extenstion == webm)
+		return ("video/" + extenstion);
+	return ("application/octet-stream");
 }
 
 void    Response::BuildGetResponse(void)
 {
-    std::ostringstream  oss;
+	std::ostringstream  oss;
 
-    oss << getState();
+	oss << getState();
 
-    fd = open(path.c_str(), O_RDONLY);
+	struct stat info;
 
-    struct stat info;
+	stat(path.c_str(), &info);
 
-    stat(path.c_str(), &info);
+	std::ostringstream  os;
+	os << info.st_size;
 
-    std::ostringstream  os;
-    os << info.st_size;
+	responseBody = Request.getVersion() + " " + oss.str() + " " + getStrState() + "\r\n";
+	responseBody += "Content-Type: " + MIME_Type() + "\r\n";
+	responseBody += "Content-Length: " + os.str() + "\r\n";
+	addCookiesToHeaders();
+	responseBody += "Connection: close\r\n\r\n";
 
-    std::string header = "HTTP/1.1 " + oss.str() + " " + getStrState() + "\r\n";
-    header += "Content-Type: " + MIME_Type() + "\r\n";
-    header += "Content-Length: " + os.str() + "\r\n";
-    header += "Connection: close\r\n\r\n";
-    
-    send(fd_client, header.c_str(), strlen(header.c_str()), MSG_NOSIGNAL);
-
-    char buffer[4096];
-    ssize_t n(0);
-
-	while ((n = read(fd, buffer, sizeof(buffer))) > 0)
-        send(fd_client, buffer, n, MSG_NOSIGNAL);
-
-    close(fd);
+	std::ifstream fd(path.c_str(), std::ios::in | std::ios::binary);
+	if (fd)
+	{
+		std::ostringstream body;
+		body << fd.rdbuf();
+		responseBody += body.str();
+		fd.close();
+	}
 }
 
 bool    Response::ReturnDirective(void)
 {
-    std::ostringstream   statuscode;
-    std::string         redirecturl;
+	std::ostringstream	statuscode;
+	std::string         redirecturl;
+	int					code;
+	std::string			body;
 
-    CheckLocations(path);
+	if (location)
+	{
+		if (location->getReturnDirective().enabled == false)
+			return (true);
 
-    if (ServerBlock.getReturnDirective().enabled == false && 
-        location.getReturnDirective().enabled == false)
-        return (true);
-    else if (FromLocation == true)
-    {
-        statuscode << location.getReturnDirective().status_code;
-        redirecturl = location.getReturnDirective().target;
-    }
-    else
-    {
-        statuscode << ServerBlock.getReturnDirective().status_code;
-        redirecturl = ServerBlock.getReturnDirective().target;
-    }
+		statuscode << location->getReturnDirective().status_code;
+		redirecturl = location->getReturnDirective().target;
+		code = location->getReturnDirective().status_code;
+		SetState(code);
+		body = location->getReturnDirective().target;
+	}
+	else
+	{
+		if (ServerBlock.getReturnDirective().enabled == false)
+			return (true);
 
-    std::string response = "HTTP/1.1 " + statuscode.str() + " Redirect\r\n";
-    response += "Location: " + redirecturl + "\r\n";
-    response += "Content-Length: 0\r\n";
-    response += "Connection: close\r\n\r\n";
-    send(fd_client, response.c_str(), strlen(response.c_str()), MSG_NOSIGNAL);
-    return (false);
-}
+		statuscode << ServerBlock.getReturnDirective().status_code;
+		redirecturl = ServerBlock.getReturnDirective().target;
+		code = ServerBlock.getReturnDirective().status_code;
+		body = ServerBlock.getReturnDirective().target;
+		SetState(code);
+	}
 
-void    Response::ChildProccess(std::string interpreter)
-{
-    std::vector<std::string>    env_storage;
-    env_storage.clear();
+	if (code == 301 || code == 302 || code == 303
+		|| code == 307 || code == 308)
+	{
+		responseBody = Request.getVersion() + " " + statuscode.str() + " " + getStrState() + "\r\n";
+		responseBody += "Location: " + redirecturl + "\r\n";
+		responseBody += "Content-Length: 0\r\n";
+		responseBody += "Connection: close\r\n\r\n";
+	}
 
-    env_storage.push_back("REQUEST_METHOD=" + Request.getMethod());
-    env_storage.push_back("SCRIPT_NAME=" + Request.getUri());
-    env_storage.push_back("SCRIPT_FILENAME=" + path);
-    env_storage.push_back("QUERY_STRING=" + Request.getQueryString());
-    env_storage.push_back("CONTENT_TYPE=" + Request.getHeaderValue("content-type"));
-    env_storage.push_back("SERVER_PROTOCOL=HTTP/1.1");
+	else
+	{
+		std::ostringstream  os;
+		os << body.size();
 
-    for (size_t i = 0; i < env_storage.size(); ++i)
-        env[i] = (char*) env_storage[i].c_str();
-    env[env_storage.size()] = NULL;
+		responseBody = Request.getVersion() + " " + statuscode.str() + " " + getStrState() + "\r\n";
+		responseBody += "Content-Length: " + os.str() + "\r\n";
+		responseBody += "Connection: close\r\n\r\n";
+		responseBody += body;
+	}
 
-    char    *argv[3];
-    argv[0] = (char*) interpreter.c_str();
-    argv[1] = (char*) path.c_str();
-    argv[2] = NULL;
-
-    if (execve (argv[0], argv, env) == -1)
-        std::cerr << "execve: failed\n";
-
-    exit(1);
-}
-
-bool    Response::CheckForCGI(void)
-{
-    size_t  pos = path.rfind('.');
-    if (pos == std::string::npos)
-        return true;
-
-    std::string extenstion = path.substr(pos + 1);
-    std::string interpreter = location.getCgiInfo(extenstion);
-
-    if (interpreter.empty() || access(interpreter.c_str(), F_OK | X_OK) == -1)
-        return (SetState(Internal_Server_Error), ResponseWithError(NONE), false);
-
-    int pipe_fd[2];
-    if (pipe(pipe_fd) == -1)
-        return (SetState(Internal_Server_Error), ResponseWithError(NONE), false);
-    int pid = fork();
-    if (pid == -1)
-        return (SetState(Internal_Server_Error), ResponseWithError(NONE), false);
-    else if (pid == 0)
-    {
-        close(pipe_fd[0]);
-        dup2(pipe_fd[1], 1);
-        close(pipe_fd[1]);
-        ChildProccess(interpreter);
-    }
-    int status(0);
-    waitpid(pid, &status, 0);
-    if (status == 1)
-        return (SetState(Internal_Server_Error), ResponseWithError(NONE), false);
-    close(pipe_fd[1]);
-
-    char buffer[4096];
-    ssize_t n(0);
-    std::string cgi;
-
-	while ((n = read(pipe_fd[0], buffer, sizeof(buffer))) > 0){
-        buffer[n] = 0;
-        cgi += buffer;
-    }
-
-    close(pipe_fd[0]);
-    return (true);
+	return (false);
 }
 
 void    Response::GetPageResponse(void)
 {
-    struct stat info;
+	struct stat info;
 
-    if (ReturnDirective() == false)
-        return ;
+	if (stat(path.c_str(), &info) == -1)
+		return (SetState(Not_Found), ResponseWithError(NONE));
 
-    if (GetFullPath(path) == false)
-        return ;
+	if (!S_ISREG(info.st_mode))
+		if (S_ISDIR(info.st_mode))
+			return (SearchForIndex());
 
-    if (stat(path.c_str(), &info) == -1)
-        return (SetState(Not_Found), ResponseWithError(NONE));
-        
-    if (S_ISDIR(info.st_mode))
-        return (SearchForIndex());
+	if (access(path.c_str(), R_OK) != 0)
+		return (SetState(Forbidden), ResponseWithError(NONE));
 
-    if (access(path.c_str(), R_OK) != 0)
-        return (SetState(Forbidden), ResponseWithError(NONE));
-
-    BuildGetResponse();
+	BuildGetResponse();
 }
 
 void    Response::BuildDeleteResponse(void)
 {
-    if (unlink(path.c_str()) == -1)
-        return (SetState(Internal_Server_Error), ResponseWithError(NONE));
+	if (unlink(path.c_str()) == -1)
+		return (SetState(Internal_Server_Error), ResponseWithError(NONE));
 
-    std::string headers = "HTTP/1.1 204 No Content\r\n";
-    headers += "Content-Length: 0\r\n";
-    headers += "Connection: close\r\n\r\n";
-
-    send(fd_client, headers.c_str(), strlen(headers.c_str()), MSG_NOSIGNAL);
+	responseBody = Request.getVersion() + " 204 No Content\r\n";
+	responseBody += "Content-Length: 0\r\n";
+	responseBody += "Connection: close\r\n\r\n";
 }
 
 void    Response::DeleteContentResponse(void)
 {
-    struct stat info;
-    std::cout << path << "\n";
-    if (ReturnDirective() == false)
-        return ;
+	struct stat info;
 
-    if (GetFullPath(path) == false)
-        return ;
+	if (stat(path.c_str(), &info) == -1)
+	{
+		if (errno == ENOENT)
+			return (SetState(Not_Found), ResponseWithError(NONE));
+		return (SetState(Internal_Server_Error), ResponseWithError(NONE));
+	}
 
-    if (stat(path.c_str(), &info) == -1)
-        return (SetState(Not_Found), ResponseWithError(NONE));
+	size_t	pos = path.rfind('/');
 
-    if (S_ISDIR(info.st_mode) || access(path.c_str(), W_OK) != 0)
-        return (SetState(Forbidden), ResponseWithError(NONE));
+	if (S_ISDIR(info.st_mode) || pos == std::string::npos)
+		return (SetState(Forbidden), ResponseWithError(NONE));
 
-    BuildDeleteResponse();
+	std::string	dir_path = path.substr(0, pos);
+
+	if (access(dir_path.c_str(), W_OK | X_OK) != 0)
+		return (SetState(Forbidden), ResponseWithError(NONE));
+
+	BuildDeleteResponse();
 }
 
 void    Response::BuildPostResponse(void)
 {
-    std::ostringstream  os;
-    std::ostringstream  oss;
+	std::ostringstream  os;
+	std::ostringstream  oss;
 
-    os << getState();
-    std::string body = "<html><body><h1>Upload Successful</h1></body></html>";
-    oss << body.size();
-    std::string headers = "HTTP/1.1 " + os.str() + getStrState() + "\r\n";
-    headers += "content-Length: " + oss.str() + "\r\n";
-    headers += "Connection: close\r\n\r\n";
+	os << getState();
+	std::string body = "<html><body><h1>Upload Successful</h1></body></html>";
+	oss << body.size();
+	std::string headers = Request.getVersion() + " " + os.str() + " " + getStrState() + "\r\n";
+	headers += "Content-Type: text/html\r\n";
+	headers += "Content-Length: " + oss.str() + "\r\n";
+	headers += "Connection: close\r\n\r\n";
 
-    std::string response = headers + body;
-
-    send(fd_client, response.c_str(), response.size(), MSG_NOSIGNAL);
+	responseBody = headers + body;
 }
 
-bool    Response::MultiPart(std::string body)
+bool	Response::MultiPart(std::string body)
 {
-    struct stat info;
-    std::string filename;
+	struct stat	info;
+	std::string	filename;
+	size_t pos = body.find("Content-Disposition:");
+	ignore = false;
 
-    size_t  pos = body.find("Content-Disposition:");
-    if (pos != std::string::npos)
-    {
-        size_t end = body.find('\n', pos);
-        if (end != std::string::npos)
-        {
-            std::string line = body.substr(pos, end - pos);
-            if ((pos = line.find("filename=")) != std::string::npos)
-            {
-                size_t start = line.find('"', pos);
-                size_t finish = line.find('"', start + 1);
-                if (start != std::string::npos && finish != std::string::npos)
-                    filename = line.substr(start + 1, finish - (start + 1));
-            }
-        }
-    }
-    size_t  clrf = body.find("\r\n\r\n");
-    if (clrf != std::string::npos)
-        Body += body.substr(clrf + 4);
+	if (pos != std::string::npos)
+	{
+		size_t end = body.find('\n', pos);
+		if (end != std::string::npos)
+		{
+			std::string line = body.substr(pos, end - pos);
+			if ((pos = line.find("filename=")) != std::string::npos)
+			{
+				size_t start = line.find('"', pos);
+				size_t finish = line.find('"', start + 1);
+				if (start != std::string::npos && finish != std::string::npos)
+					filename = line.substr(start + 1, finish - (start + 1));
+			}
+			else
+				return (ignore = true, true);
+		}
+	}
+	if (filename.empty())
+		return (ignore = true, true);
 
-    if (path[path.size() - 1] == '/')
-    {
-        if (stat(path.c_str(), &info) == -1)
-            return (SetState(Not_Found), ResponseWithError(NONE), false);
+	size_t clrf = body.find("\r\n\r\n");
+	if (clrf != std::string::npos)
+		Body += body.substr(clrf + 4);
 
-        if (!S_ISDIR(info.st_mode))
-            return (SetState(Conflict), ResponseWithError(NONE), false);
-    }
-    else
-    {
-        if (stat(path.c_str(), &info) == -1)
-            return (SetState(Created), true);
+	std::string upload_path = path;
+	if (location && !location->getUploadStore().empty())
+	{
+		upload_path = location->getUploadStore();
+		if (upload_path[upload_path.size() - 1] != '/')
+			upload_path += "/";
+	}
+	else
+		return (SetState(Forbidden), ResponseWithError(NONE), false);
 
-        if (S_ISDIR(info.st_mode))
-            return (SetState(Conflict), ResponseWithError(NONE), false);
-    }
+	if (stat(upload_path.c_str(), &info) == -1 || !S_ISDIR(info.st_mode)
+		|| access(upload_path.c_str(), W_OK) == -1)
+		return (SetState(Internal_Server_Error), ResponseWithError(NONE), false);
 
-    if (access(path.c_str(), W_OK) == -1)
-        return (SetState(Forbidden), ResponseWithError(NONE), false);
+	SetPath(upload_path + filename);
 
-    if (!filename.empty())
-        SetPath(path + "/" + filename);
-    return (true);
+	return true;
 }
 
 bool    Response::Chunked(void)
 {
-    struct stat info;
+	struct stat info;
 
-    if (path[path.size() - 1] == '/')
-    {
-        if (stat(path.c_str(), &info) == -1)
-            return (SetState(Not_Found), ResponseWithError(NONE), false);
+	Body = Request.getBufferBody();
 
-        if (S_ISDIR(info.st_mode))
-            return (SetState(Conflict), ResponseWithError(NONE), false);
+	std::string upload_path = path;
 
-        return (SetState(Bad_Request), ResponseWithError(NONE), false);
-    }
+	if (location && !location->getUploadStore().empty())
+	{
+		upload_path = location->getUploadStore();
+		if (upload_path[upload_path.size() - 1] != '/')
+			upload_path += "/";
+	}
+	else
+		return (SetState(Forbidden), ResponseWithError(NONE), false);
 
-    if (stat(path.c_str(), &info) == -1)
-        return (SetState(Created), true);
+	if (stat(upload_path.c_str(), &info) == -1)
+		return (SetState(Internal_Server_Error), ResponseWithError(NONE), false);
 
-    if (S_ISDIR(info.st_mode))
-        return (SetState(Conflict), ResponseWithError(NONE), false);
+	size_t	pos = path.find_last_of("/");
 
-    if (access(path.c_str(), F_OK | W_OK) == -1)
-        return (SetState(Forbidden), ResponseWithError(NONE), false);
-    
-    return (true);
+	upload_path += path.substr(pos + 1);
+	SetPath(upload_path);
+
+	if (upload_path[upload_path.size() - 1] == '/')
+		return (SetState(Bad_Request), ResponseWithError(NONE), false);
+
+	if (stat(upload_path.c_str(), &info) == -1)
+		return (SetState(Created), true);
+
+	if (S_ISDIR(info.st_mode))
+		return (SetState(Conflict), ResponseWithError(NONE), false);
+
+	if (access(upload_path.c_str(), W_OK) == -1)
+		return (SetState(Forbidden), ResponseWithError(NONE), false);
+
+	return (true);
 }
 
 void    Response::PostContentResponse(void)
 {
-    std::string ContentType = Request.getHeaderValue("content-type");
-    size_t      multipart = ContentType.find("multipart/form-data");
+	std::string ContentType = Request.getHeaderValue("content-type");
+	size_t      multipart = ContentType.find("multipart/form-data");
 
-    if (ReturnDirective() == false)
-        return ;
+	if (multipart != std::string::npos)
+	{
+		std::vector<std::string>    body = Request.getMultipartBuferBody();
+		for (size_t i(0); i < body.size(); i++)
+		{
+			std::string old_path = getPath();
+			if (MultiPart(body[i]) == false)
+				return ;
+			
+			if (ignore)
+				continue ;
 
-    if (GetFullPath(path) == false)
-        return ;
+			std::ofstream	fd(path.c_str());
 
-    if (multipart != std::string::npos)
-    {
-        std::vector<std::string>    body = Request.getMultipartBuferBody();
-        for (size_t i(0); i < body.size(); i++)
-        {
-            std::string old_path = getPath();
-            if (MultiPart(body[i]) == false)
-                return ;
+			if (fd)
+			{
+				fd << Body;
+				fd.close();
+			}
 
-            int fd_file(0);
+			SetPath(old_path);
+			Body = "";
+		}
+		BuildPostResponse();
+		return ;
+	}
+	else
+	{
+		if (Chunked() == false)
+			return ;
+	}
 
-            if ((fd_file = open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644)) == -1)
-                return (SetState(Forbidden), ResponseWithError(NONE));
+	std::ofstream	fd(path.c_str());
 
-            if (write(fd_file, Body.c_str(), Body.size()) == -1)
-                return (close(fd_file), SetState(Internal_Server_Error), ResponseWithError(NONE));
-            
-            close(fd_file);
-            
-            BuildPostResponse();
-            SetPath(old_path);
-            Body = "";
-        }
-        return ;
-    }
-    else
-    {
-        if (Chunked() == false)
-            return ;
-    }
+	if (fd)
+	{
+		fd << Body;
+		fd.close();
+	}
 
-    int fd_file(0);
-
-    if ((fd_file = open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644)) == -1)
-        return (SetState(Forbidden), ResponseWithError(NONE));
-
-    if (write(fd_file, Body.c_str(), Body.size()) == -1)
-        return (close(fd_file), SetState(Internal_Server_Error), ResponseWithError(NONE));
-    
-    close(fd_file);
-    
-    BuildPostResponse();
+	BuildPostResponse();
 }
 
 void    Response::ResponseWithOk(void)
 {
-    std::string Method = Request.getMethod();
+	std::string Method = Request.getMethod();
 
-    if (Method == GET)
-        GetPageResponse();
+	if (Method == GET)
+		GetPageResponse();
 
-    else if (Method == POST)
-        PostContentResponse();
+	else if (Method == POST)
+		PostContentResponse();
 
-    else
-        DeleteContentResponse();
+	else
+		DeleteContentResponse();
 }
 
 std::string Response::DefaultForMatchError(void)
 {
-    int error = getState();
-    
-    if (error == Moved_Permanently)
-        return "./error_pages/Moved_Permanently.html";
-    else if (error == Bad_Request)
-        return "./error_pages/Bad_request.html";
-    else if (error == Forbidden)
-        return "./error_pages/Forbidden.html";
-    else if (error == Not_Found)
-        return "./error_pages/Not_Found.html";
-    else if (error == Method_Not_Allowed)
-        return "./error_pages/Method_Not_Allowed.html";
-    else if (error == Conflict)
-        return "./error_pages/Conflict.html";
-    else if (error == Length_Required)
-        return "./error_pages/Length_Required.html";
-    else if (error == Content_Too_Large)
-        return "./error_pages/Content_Too_Large.html";
-    else if (error == URI_Too_Long)
-        return "./error_pages/URI_Too_Long.html";
-    else if (error == Unsupported_Media_Type)
-        return "./error_pages/Unsupported_Media_Type.html";
-    else if (error == Request_Header_Fields_Too_Large)
-        return "./error_pages/Request_Header_Fields_Too_Large.html";
-    else if (error == Internal_Server_Error)
-        return "./error_pages/Internal_Server_Error.html";
-    else if (error == Not_Implemented)
-        return "./error_pages/Not_Implemented.html";
-    else
-        return "./error_pages/HTTP_Version_Not_Supported.html";
+	int error = getState();
+
+	if (error == Moved_Permanently)
+		return "./error_pages/Moved_Permanently.html";
+	else if (error == Bad_Request)
+		return "./error_pages/Bad_Request.html";
+	else if (error == Forbidden)
+		return "./error_pages/Forbidden.html";
+	else if (error == Not_Found)
+		return "./error_pages/Not_Found.html";
+	else if (error == Method_Not_Allowed)
+		return "./error_pages/Method_Not_Allowed.html";
+	else if (error == Conflict)
+		return "./error_pages/Conflict.html";
+	else if (error == Length_Required)
+		return "./error_pages/Length_Required.html";
+	else if (error == Content_Too_Large)
+		return "./error_pages/Content_Too_Large.html";
+	else if (error == Request_Timeout)
+		return ("./error_pages/Request_Timeout.html");
+	else if (error == URI_Too_Long)
+		return "./error_pages/URI_Too_Long.html";
+	else if (error == Unsupported_Media_Type)
+		return "./error_pages/Unsupported_Media_Type.html";
+	else if (error == Request_Header_Fields_Too_Large)
+		return "./error_pages/Request_Header_Fields_Too_Large.html";
+	else if (error == Internal_Server_Error)
+		return "./error_pages/Internal_Server_Error.html";
+	else if (error == Not_Implemented)
+		return "./error_pages/Not_Implemented.html";
+	else if (error == Bad_Gateway)
+		return "./error_pages/Bad_Gateway.html";
+	else if (error == Gateway_Timeout)
+		return "./error_pages/Gateway_Timeout.html";
+	else
+		return "./error_pages/HTTP_Version_Not_Supported.html";
 }
 
 void    Response::ResponseWithError(int serve)
 {
-    CheckLocations(path);
-    if (serve == DEFAULT)
-    {
-        SetPath(DefaultForMatchError());
-        BuildGetResponse();
-        return ;
-    }
+	if (serve == DEFAULT)
+	{
+		SetPath(DefaultForMatchError());
+		BuildGetResponse();
+		return ;
+	}
 
-    struct stat info;
-    std::string error_page = ServerBlock.getErrorPage(getState());
-    
-    if (!error_page.empty())
-    {
-        SetStatePath(RES_ERROR);
-        SetPath(error_page);
-        if (GetFullPath(path) == false)
-            return ;
+	struct stat info;
+	std::string error_page = ServerBlock.getErrorPage(getState());
 
-        if (stat(path.c_str(), &info) != 0)
-            return (SetState(Not_Found), ResponseWithError(DEFAULT));
+	if (!error_page.empty())
+	{
+		SetPath(error_page);
+		Request.setUri(path);
+		SetLocation(NULL);
+		Request.FindMatchLocation();
+		SetLocation(Request.getMatchLocation());
 
-        else if (S_ISDIR(info.st_mode) || access(path.c_str(), R_OK) != 0)
-            return (SetState(Internal_Server_Error), ResponseWithError(DEFAULT));
-    }
-    else
-        return (ResponseWithError(DEFAULT));
-    
-    BuildGetResponse();
+		GetFullPath(path);
+
+		if (stat(path.c_str(), &info) != 0)
+			return (SetState(Not_Found), ResponseWithError(DEFAULT));
+
+		else if (S_ISDIR(info.st_mode) || access(path.c_str(), R_OK) != 0)
+			return (SetState(Internal_Server_Error), ResponseWithError(DEFAULT));
+	}
+	else
+		return (ResponseWithError(DEFAULT));
+
+	BuildGetResponse();
 }
 
-void    Response::StartForResponse(ParseRequest request, Server BlockServer, int fd_client)
+bool	Response::shouldExecuteCgi(ParseRequest& request)
 {
-    SetRequest(request);
-    SetBlockServer(BlockServer);
-    SetState(request.getErrorNumber());
-    SetPath(request.getUri());
-    SetStatePath(NORMAL);
-    this->fd_client = fd_client;
+	Location* location = this->location;
+	if (!location)
+		return false;
 
-    if (getState() == Method_Not_Allowed)
-        ResponseWithError(NONE);
+	bool is_cgi = location->isCgiRequest(request.getUri());
+	if (is_cgi && request.getMethod() == "DELETE")
+		return false;
 
-    else if (getState() != OK)
-    {
-        if (ReturnDirective() == false)
-            return ;
-        ResponseWithError(NONE);
-    }
+	return is_cgi;
+}
 
-    else
-        ResponseWithOk();
+void    Response::StartForResponse(ParseRequest request, int fd_client)
+{
+	SetRequest(request);
+	SetBlockServer(*(request.getBlockServer()));
+	SetState(request.getErrorNumber());
+	SetPath(request.getUri());
+	SetLocation(request.getMatchLocation());
+	this->fd_client = fd_client;
+	GetFullPath(path);
+
+	if (ReturnDirective() == false)
+		return ;
+
+	if (shouldExecuteCgi(Request))
+	{
+		try {
+			handleCgiRequest(Request);
+		} catch (...) {
+			SetState(Internal_Server_Error);
+			ResponseWithError(NONE);
+		}
+		return;
+	}
+
+	else if (getState() != OK)
+		ResponseWithError(NONE);
+
+	else
+		ResponseWithOk();
+}
+
+void	Response::handleCgiRequest(ParseRequest& request)
+{
+	try
+	{
+		Location* location = this->location;
+		if (!location)
+			return (SetState(Not_Found), ResponseWithError(NONE));
+		
+		if (!location->isCgiRequest(request.getUri()))
+			return (SetState(Not_Found), ResponseWithError(NONE));
+
+		std::string script_path = path;
+
+		if (script_path.empty() || access(script_path.c_str(), F_OK | R_OK) != 0)
+			return (SetState(Not_Found), ResponseWithError(NONE));
+
+		std::string file_extension = getFileExtension(request.getUri());
+		std::string interpreter = location->getCgiInterpreter(file_extension);
+
+		if (interpreter.empty())
+			return (SetState(Internal_Server_Error), ResponseWithError(NONE));
+
+		Cgi cgi(script_path, interpreter);
+		CgiResult result = cgi.execute(request);
+
+		if (result.success)
+			sendCgiResponse(result);
+		else
+			return (SetState(result.status_code), ResponseWithError(NONE));
+	}
+	catch (const std::exception& e)
+	{
+		SetState(500);
+		ResponseWithError(NONE);
+	}
+}
+
+void	Response::sendCgiResponse(const CgiResult& cgi_result)
+{
+	responseBody = Request.getVersion() + " " + intToString(cgi_result.status_code) + " OK\r\n";
+	
+	responseBody += cgi_result.headers;
+	
+	for (std::vector<std::string>::iterator it = cookies_to_set.begin(); it != cookies_to_set.end(); ++it)
+		responseBody += *it + "\r\n";
+	
+	responseBody += "Content-Length: " + intToString(cgi_result.body.length()) + "\r\n";
+	responseBody += "Connection: close\r\n";
+	responseBody += "\r\n";
+	responseBody += cgi_result.body;
+}
+
+std::string	Response::getFileExtension(const std::string& uri)
+{
+	size_t dot_pos = uri.find_last_of('.');
+	if (dot_pos == std::string::npos) return "";
+	return uri.substr(dot_pos);
 }
 
 int     Response::getState() const {return state;}
 
+std::string	Response::GetResponseBody() const {return responseBody;}
+
 std::string Response::getPath() {return path;}
+
+bool	Response::getBuildRes() {return buildRes;}
+
+size_t	Response::getBytes() {return bytes;}
+
+void	Response::SetBuildRes(bool buildres) {this->buildRes = buildres;}
+
+void	Response::SetBytes(size_t bytes) {this->bytes = bytes;}
 
 void    Response::SetRequest(ParseRequest Request){this->Request = Request;}
 
 void    Response::SetBlockServer(Server BlockServer){this->ServerBlock = BlockServer;}
 
-void    Response::SetLocation(Location location){this->location = location; this->FromLocation = true;}
+void    Response::SetLocation(Location* location){this->location = location;}
 
 void    Response::SetState(int state){this->state = state;}
 
-void    Response::SetStatePath(int state_path){this->state_path = state_path;}
-
 void    Response::SetPath(std::string path){this->path = path;}
+
+void	Response::setCookie(const std::string& name, const std::string& value, 
+						  const std::string& path, const std::string& expires, bool http_only)
+{
+	std::string cookie = "Set-Cookie: " + name + "=" + value;
+	if (!path.empty())
+		cookie += "; Path=" + path;
+	if (!expires.empty())
+		cookie += "; Expires=" + expires;
+	if (http_only)
+		cookie += "; HttpOnly";
+	cookie += "; SameSite=Strict";
+	cookies_to_set.push_back(cookie);
+}
+
+void	Response::addCookiesToHeaders()
+{
+	for (std::vector<std::string>::iterator it = cookies_to_set.begin(); it != cookies_to_set.end(); ++it)
+		responseBody += *it + "\r\n";
+}
+
+void	Response::setSessionManager(SessionManager* sm)
+{
+	sessionManager = sm;
+}

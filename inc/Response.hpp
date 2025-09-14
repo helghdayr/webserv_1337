@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:28:12 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/06/23 18:23:10 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/08/27 13:17:41 by hael-ghd         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,15 +19,18 @@
 #include "Lexer.hpp"
 #include "Location.hpp"
 #include "Server.hpp"
+#include "SessionManager.hpp"
 #include <utility>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <string.h>
+#include <cstring>
 #include <fcntl.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include "Cgi.hpp"
+#include <fstream>
 
 #define GET "GET"
 #define POST "POST"
@@ -40,8 +43,6 @@
 
 #define DEFAULT 0
 #define NONE 1
-#define NORMAL 2
-#define RES_ERROR 3
 
 #define html "html"
 #define htm "htm"
@@ -72,10 +73,15 @@ enum ResponseNumberState
     OK = 200,
     Created = 201,
     Moved_Permanently = 301,
+    Found = 302,
+    See_Other = 303,
+    Temporary = 307,
+    Permanent_Redirect = 308,
     Bad_Request = 400,
     Forbidden = 403,
     Not_Found = 404,
     Method_Not_Allowed = 405,
+    Request_Timeout = 408,
     Conflict = 409,
     Length_Required = 411,
     Content_Too_Large = 413,
@@ -84,7 +90,9 @@ enum ResponseNumberState
     Request_Header_Fields_Too_Large = 431,
     Internal_Server_Error = 500,
     Not_Implemented = 501,
-    HTTP_Version_Not_Supported = 505,   
+    Bad_Gateway = 502,
+	Gateway_Timeout = 504,
+    HTTP_Version_Not_Supported = 505, 
 };
 
 class Response{
@@ -96,37 +104,59 @@ class Response{
         int                 state_path;
         ParseRequest        Request;
         Server              ServerBlock;
-        Location            location;
-        bool                FromLocation;
+        Location*           location;
         std::string         path;
         char                *env[7];
         std::string         Body;
+        SessionManager*		sessionManager;
+        std::vector
+			<std::string>	cookies_to_set;
+        std::string         responseBody;
+        bool                buildRes;
+        bool                ignore;
+        size_t              bytes;
+		
+
+
+        bool			shouldExecuteCgi(ParseRequest& request);
+        void			sendCgiResponse(const CgiResult& cgi_result);
+        std::string		getFileExtension(const std::string& uri);
+        void			setCookie(const std::string& name, const std::string& value, 
+                                const std::string& path = "/", const std::string& expires = "", 
+                                bool http_only = true);
+        void           addCookiesToHeaders();
         
-        public:
+    public:
         Response();
         ~Response();
+
+        void   	handleCgiRequest(ParseRequest& request);
+        void	setSessionManager(SessionManager* sm);
         
         // Setters
         
-        std::string         res;
         void    SetRequest(ParseRequest Request);
         void    SetBlockServer(Server BlockServer);
         void    SetState(int state);
-        void    SetStatePath(int state_path);
-        void    SetLocation(Location location);
-        void    SetPath(std::string path);        
+        void    SetLocation(Location* location);
+        void    SetPath(std::string path);
+        void	SetBuildRes(bool buildres);
+        void	SetBytes(size_t bytes);        
         
         // Getters
         
         std::string getPath();
+        size_t      getBytes();
+        bool        getBuildRes();
         int         getState(void) const;
         std::string getStrState(void) const;
         std::string MIME_Type(void) const;
         std::string ConnectionState(void) const;
+        std::string GetResponseBody(void) const;
         
         // Startresponse
         
-        void    StartForResponse(ParseRequest Request, Server BlockServer, int fd_client);
+        void    StartForResponse(ParseRequest Request, int fd_client);
         
         void    ResponseWithError(int serve);
         
@@ -144,9 +174,9 @@ class Response{
         
         void    CheckLocations(std::string& path);
         
-        bool    GetFullPath(std::string& path);
+        void    GetFullPath(std::string& path);
         
-        bool    CheckForCGI(void);
+
         
         bool    CheckAutoIndex(void);
         
@@ -163,8 +193,6 @@ class Response{
         void    BuildPostResponse(void);
 
         std::string DefaultForMatchError(void);
-
-        void    ChildProccess(std::string interpreter);
 
         bool    MultiPart(std::string body);
 

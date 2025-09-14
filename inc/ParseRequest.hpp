@@ -7,16 +7,30 @@
 #include <utility>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <string.h>
+#include <cstring>
 #include <zlib.h>
-//#include <brotli/decode.h>
+#include <ctime>
+// #include <brotli/decode.h>
 #include "Server.hpp"
+#include "Config.hpp"
+
+
+#define READING_BUFFER_SIZE 5000
+#define HEADERS_ENDING "\r\n\r\n"
 #define CLRF "\r\n"
 #define SPACE ' '
+#define RED "\033[1;31m"
+#define YLW "\033[1;33m"
+#define RESET "\033[0m"
+#define GRN "\e[0;32m"
+#define READING_HEADERS 100
+#define READING_BODY 200
+
+// ENUM_HOLDS_PARSING_MACHINE_STATES_____________________________
 
 enum RequestParser
 {
-    NONE,
+    PARSER_NONE,
     METHOD,
     URL,
     HTTPVERSION,
@@ -26,8 +40,8 @@ enum RequestParser
     CONTENTLENGTHBODY,
     READCHUNKSIZE,
     READCHUNK,
-	READ_BOUNDARY,
-	READ_MULTIPART_BODY,
+    READ_BOUNDARY,
+    READ_MULTIPART_BODY,
     PARSEARRAYSIZE,
     FINISH,
     ERROR,
@@ -38,15 +52,25 @@ enum RequestParser
 };
 
 class ParseRequest{
+    
     public:
+
+        // CONSTRUCTORS_AND_DISTRUCTOR_________________________________
+
         ParseRequest();
         ParseRequest(Server *server);
-        // ParseRequest(ParseRequest& other);
-        // ParseRequest& operator=(const ParseRequest& other);
         ~ParseRequest();
 
     private:
+
+        // VARIABLES_____________________________________________________
+
+    
+        char                                                ReadingBuffer[READING_BUFFER_SIZE + 1];
+        std::string                                         Current_PrasingLine;
+        int                                                 ReadingPhase;
         int                                                 errorNumber;
+        std::string                                         Request_Buff;
         size_t                                              pos;
         int                                                 CurrntParsState;
         std::string                                         Current_key;
@@ -63,6 +87,7 @@ class ParseRequest{
         bool                                                hasValidHost;
         size_t                                              ChunkSize;
         std::string                                         BufferBody;
+        std::string                                         RequestBufferbody;
         std::string                                         MultipartBoundary;
         std::vector<std::string >                           MultipartBufferBody;
         std::string                                         DecompressedBufferBody;
@@ -70,13 +95,25 @@ class ParseRequest{
         std::string                                         Host;
         std::string                                         Port;
         std::string                                         QueryString;
+        std::map<std::string, std::string>                  cookies;
+        Location*                                           MatchLocation;
+        std::time_t                                         Time;
+        
+        // FUNCTOIONS_POINTER_PARSING_TABLES_____________________________________________________________
+
         typedef void                                        (ParseRequest::*ParseFuncPtr)(std::string& buffer);
         static  const ParseFuncPtr                          ParseTable[];
 
 
     public:
-        // parse input
-        void        startParse(int fd, Server server);
+        // FINDING_THE_BLOCK_SERVER_FOR_REQUEST__________________________________________________________________
+
+        Server*                                             findBlockServer(const Config& config, std::string buff, Server* server);
+        
+        
+        // PARSING_FUNCTIONS________________________________________________
+
+        void        startParse(int fd, const Config& config, Server* server);
         void        StartNewRequest(std::string& buff);
         void        parseMethod(std::string& str);
         void        parseUrl(std::string& str);
@@ -84,9 +121,19 @@ class ParseRequest{
         void        parseHeaders(std::string& str);
         void        CheckingForBody();
         void        parseContentlengthBody(std::string &str);
-        void        parseChunkedBody(std::string &str);
+        void        parseChunkedBody(std::string& str);
+        void        ParseMultipartBodyBoundary(std::string &None);
+        void        ParseMultiPartBufferBody(std::string &None);
+        void        parseCookies(std::string& None);
+        void        ReadAndParseIntilHeadersFinish(std::string& buff, int fd, const Config& config, Server* server);
+        void        ReadAndParseRequestBody(std::string& buff, int fd);
+
+
+        // PARSING_HELPERS_________________________________________________
+
         int         HexaStringToDecimalNum(std::string s);
         void        trimBuff(std::string &str);
+        void        trimBuffTail(std::string &str);
         void        toLowerCase(std::string &key);
         bool        isAllSpaces(std::string &str);
         bool        validKey(std::string &key);
@@ -94,11 +141,7 @@ class ParseRequest{
         bool        isNumber(std::string toCheck);
         void        ResetParserf();
         void        DecompressBody();
-        void		ParseMultipartBodyBoundary(std::string &None);
-        void        ParseMultiPartBufferBody(std::string &None);
-
-        // checkers
-        bool        isFinish();
+        bool        isFinish(int RecvReturn);
         bool        isSupportedMethod(std::string &RequestMethod);
         int         isKnownMethod();
         bool        isValidUrl();
@@ -108,8 +151,10 @@ class ParseRequest{
         bool        PercentEncoded(size_t &i);
         bool        isValidVersion();
         void        CheckContentEncoding();
+        void        FindMatchLocation();
 
-        // getters
+        // GETTER_FUNCTIONS__________________________________________________
+
         std::string&                                        getMethod();
         std::string&                                        getUri();
         std::string&                                        getVersion();
@@ -120,25 +165,34 @@ class ParseRequest{
         std::string&                                        getHost();
         std::string&                                        getPort();
         int                                                 getContentEncodingType(int Type);
-
         std::string&                                        getQueryString(void);
         std::string&                                        getBufferBody(void);
+        // std::string	                                		getBufferBody_string(void);
         size_t                                              getContentLength(void);
         std::string&                                        getBufferDecompressedBody();
+        // std::string	                                		getBufferDecompressedBody_string();
         const std::vector<std::string>&                     getMatchedLocationAllowedMethods();
-        std::vector<std::string >&							getMultipartBuferBody();
+        std::vector<std::string>&                           getMultipartBuferBody();
+        // std::vector<std::string >	                  		getMultipartBuferBody();
         int                                                 getMatchedLocationBodySizeMax();
+        Server*                                             getBlockServer();
+        std::string                                         getCookie(const std::string& name) const;
+        const std::map<std::string, std::string>&           getCookies() const;
+        Location*                                           getMatchLocation();
+        std::time_t                                         getTimeConnection();
+        
+        // SETTER_FUNCTIONS__________________________________________________
 
-        // setters
         void        setMethod(std::string m);
         void        setUri(std::string u);
         void        setVersion(std::string v);
         void        SwitchState(int Next_State);
-        void        setErrorNumber(int Number);
+        void        setErrorNumber(int Number, std::string ErrorMsg);
         void        setQueryString(std::string qurieInUrl);
         void        Reset();
         void        ResetBuffPos();
         void        setContentEncodingType(int Type);
+        void        setTimeConnection(std::time_t time);
 };
 
 #endif

@@ -1,8 +1,8 @@
 CC      = c++
 NAME    = webserv
-CFLAGS  = -Wall -Wextra -Werror -std=c++98 -MMD -MP -g -lz
+CFLAGS  = -Wall -Wextra -Werror -std=c++98 -MMD -MP
 
-SRCS    = webserv.cpp src/Lexer.cpp src/ParseDirective.cpp src/Config.cpp src/Server.cpp src/Location.cpp src/SetupServers.cpp src/ParseRequest.cpp src/Response.cpp
+SRCS    = webserv.cpp src/Lexer.cpp src/ParseDirective.cpp src/Config.cpp src/Server.cpp src/Location.cpp src/SetupServers.cpp src/ParseRequest.cpp src/Response.cpp src/DirectoryListing.cpp src/Cgi.cpp src/SessionManager.cpp
 OBJS    = $(SRCS:%.cpp=objs/%.o)
 DEPS    = $(OBJS:.o=.d)
 
@@ -11,7 +11,7 @@ all: $(NAME)
 
 $(NAME): $(OBJS)
 	@printf "\033[1;34m[✓] Linking object files...\033[0m\n"
-	@$(CC) $(CFLAGS) $^ -o $@
+	@$(CC) $(CFLAGS)  $^ -o $@ -lz
 
 objs/%.o: %.cpp
 	@mkdir -p $(dir $@)

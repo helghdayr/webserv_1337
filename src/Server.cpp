@@ -1,9 +1,12 @@
 #include "../inc/Server.hpp"
+#include <iostream>
 
 Server::Server() 
 	: client_max_body_size(0), autoindex(false)
 {
 	return_d.enabled = false;
+	client_timeout = 4;
+	header_timeout = 60;
 }
 
 Server::Server(const Server &other)  :
@@ -19,6 +22,7 @@ Server::Server(const Server &other)  :
 {
 	for (size_t i = 0; i < other.locations.size(); i++)
 		locations.push_back(new Location(*other.locations[i]));
+	client_timeout = other.client_timeout;
 }
 
 Server	&Server::operator=(const Server &other)
@@ -41,6 +45,8 @@ Server	&Server::operator=(const Server &other)
 
 		for (size_t i = 0; i < other.locations.size(); i++)
 			locations.push_back(new Location(*other.locations[i]));
+
+		client_timeout = other.client_timeout;
 	}
 	return (*this);
 }
@@ -68,6 +74,10 @@ void Server::setRoot(const std::string& root) {this->root = root;}
 
 void Server::setClientBodyLimit(size_t limit) {client_max_body_size = limit;}
 
+void Server::addClientTimeout(size_t timeout) {client_timeout = timeout;}
+
+void Server::addHeaderTimeout(size_t timeout) {header_timeout = timeout;}
+
 void Server::setAutoindex(bool autoindex) {this->autoindex = autoindex;}
 
 void Server::addIndex(const std::string& index) {this->index.push_back(index);}
@@ -79,6 +89,8 @@ const ReturnDirective	Server::getReturnDirective() const {return return_d;}
 
 const std::vector<std::pair<std::string, std::string> >& Server::getListen() const {return listen;}
 
+std::vector<std::pair<std::string, std::string> >& Server::getListen() {return listen;}
+
 const std::vector<std::string>& Server::getServerNames() const {return server_names;}
 
 const std::vector<Location*>& Server::getLocations() const {return locations;}
@@ -86,6 +98,10 @@ const std::vector<Location*>& Server::getLocations() const {return locations;}
 const std::string& Server::getRoot() const {return root;}
 
 size_t Server::getClientBodyLimit() const {return client_max_body_size;}
+
+size_t Server::getClientTimeout() const {return client_timeout;}
+
+long Server::getHeaderTimeout() const {return header_timeout;}
 
 bool Server::getAutoindex() const {return autoindex;}
 

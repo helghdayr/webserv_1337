@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
+#include <algorithm>
 #include <cstdlib>
 #include <sstream>
 
@@ -31,6 +32,8 @@ class DirectiveParser
 
 		// Specialized parsers
 		void parseListen(Server* server, const std::vector<std::string>& values);
+		void parseTimeout(Server* server, const std::vector<std::string>& values);
+		void parseHeaderTimeout(Server* server, const std::vector<std::string>& values);
 		void parseServerName(Server* server, const std::vector<std::string>& values);
 		void parseRoot(Server* server, Location* location, std::vector<std::string>& values);
 		void parseErrorPage(Server* server, const std::vector<std::string>& values);
@@ -50,7 +53,7 @@ class DirectiveParser
 		void						advance();
 		std::vector<std::string>	gatherDirectiveValues();
 		bool						isLocationDirective(const std::string& directive) const;
-		size_t						parseSize(const std::string& sizeStr);
+		size_t						parseSize(const std::string& sizeStr, std::string size);
 };
 
 static std::string intToString(int value)

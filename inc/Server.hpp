@@ -22,6 +22,8 @@ class Server
 		void addLocation(Location* location);
 		void setRoot(const std::string& root);
 		void setClientBodyLimit(size_t limit);
+		void addClientTimeout(size_t timeout);
+		void addHeaderTimeout(size_t timeout);
 		void setAutoindex(bool autoindex);
 		void addIndex(const std::string& index);
 		void addReturnDirective(const ReturnDirective);
@@ -29,6 +31,8 @@ class Server
 		// Getters
 		const std::vector<std::pair
 	 	  <std::string, std::string> >& getListen() const;
+		std::vector<std::pair
+	 	  <std::string, std::string> >& getListen();
 		const ReturnDirective			getReturnDirective() const;
 		const std::vector<std::string>& getAllowedMethods() const;
 		const std::vector<std::string>& getServerNames() const;
@@ -36,6 +40,8 @@ class Server
 		const std::vector<Location*>&	getLocations() const;
 		const std::string&				getRoot() const;
 		size_t							getClientBodyLimit() const;
+		size_t							getClientTimeout() const;
+		long							getHeaderTimeout() const;
 		bool							getAutoindex() const;
 		const std::vector<std::string>& getIndex() const;
 
@@ -51,6 +57,8 @@ class Server
 		std::vector<Location*>		locations;
 		std::string					root;
 		size_t						client_max_body_size;
+		size_t						client_timeout;
+		long						header_timeout;
 		bool						autoindex;
 		std::vector<std::string>	index;
 };
