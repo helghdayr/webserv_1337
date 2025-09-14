@@ -12,6 +12,7 @@ def analyze_text(text):
     char_count = len(text)
     word_count = len(words)
     sentence_count = len(re.split(r'[.!?]+', text))
+    if not text: sentence_count = 0
     patterns = {
         'uppercase_words': len(re.findall(r'\b[A-Z]{2,}\b', text)),
         'lowercase_words': len(re.findall(r'\b[a-z]{2,}\b', text)),

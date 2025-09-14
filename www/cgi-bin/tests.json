@@ -1,0 +1,65 @@
+{
+  "users": [
+    { "id": 101, "name": "Alice Brown", "email": "alice@example.com", "role": "admin", "lastLogin": "2024-01-20T09:15:00Z" },
+    { "id": 102, "name": "Charlie Green", "email": "charlie@example.com", "role": "user", "lastLogin": "2024-01-19T16:40:00Z" }
+  ],
+  "products": [
+    { "id": "X100", "name": "Wireless Earbuds", "price": 129.99, "category": "Audio", "stock": 30 },
+    { "id": "X101", "name": "Bluetooth Speaker", "price": 79.99, "category": "Audio", "stock": 18 }
+  ],
+  "orders": [
+    { "id": "ORD001", "userId": 101, "products": ["X100", "X101"], "total": 209.98, "status": "completed" },
+    { "id": "ORD002", "userId": 102, "products": ["X100"], "total": 129.99, "status": "shipped" }
+  ]
+}
+
+{
+  "users": [
+    { 
+      "id": 1001, 
+      "name": "Emily Chen", 
+      "email": "emily@example.com", 
+      "role": "admin", 
+      "lastLogin": "2024-01-20T10:30:00Z",
+      "department": "IT",
+      "active": true
+    },
+    { 
+      "id": 1002, 
+      "name": "Michael Wong", 
+      "email": "michael@example.com", 
+      "role": "user", 
+      "lastLogin": "2024-01-19T15:45:00Z",
+      "department": "Sales",
+      "active": true
+    }
+  ],
+  "products": [
+    { 
+      "id": "P500", 
+      "name": "Gaming Mouse", 
+      "price": 59.99, 
+      "category": "Computer Accessories", 
+      "stock": 22,
+      "description": "RGB gaming mouse with high DPI"
+    },
+    { 
+      "id": "P501", 
+      "name": "Mechanical Keyboard", 
+      "price": 89.99, 
+      "category": "Computer Accessories", 
+      "stock": 15,
+      "description": "Mechanical keyboard with blue switches"
+    }
+  ],
+  "orders": [
+    { 
+      "id": "O500", 
+      "userId": 1001, 
+      "products": ["P500", "P501"], 
+      "total": 149.98, 
+      "status": "completed",
+      "orderDate": "2024-01-15T11:30:00Z"
+    }
+  ]
+}

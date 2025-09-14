@@ -37,3 +37,4 @@ webserv
 *.exe
 *.out
 *.app
+.aider*

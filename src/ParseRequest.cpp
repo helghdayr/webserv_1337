@@ -1103,7 +1103,7 @@ void    ParseRequest::ReadAndParseIntilHeadersFinish(std::string& buff, int fd, 
                     if (Current_PrasingLine.empty())
                     {
                         Current_PrasingLine = buff.substr(0, pos + 2);
-                        std::cout << RED << "current Prase Line   : " << Current_PrasingLine << RESET;
+                        // std::cout << RED << "current Prase Line   : " << Current_PrasingLine << RESET;
                         if (buff.size() >= 2)
                             buff.erase(0, pos + 2);
                         if (Current_PrasingLine.find(CLRF) == 0)
