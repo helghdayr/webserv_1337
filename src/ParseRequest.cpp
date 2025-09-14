@@ -493,45 +493,48 @@ void    ParseRequest::parseCookies(std::string& None)
 // decompress the body only if the encoding type is gzip or deflate 
 void        ParseRequest::DecompressBody(){
 
-	z_stream	Strm;
+    z_stream    Strm;
 
-	std::memset(&Strm,0,sizeof(Strm));
+    std::memset(&Strm,0,sizeof(Strm));
 
-	int			Bits = 15;
+    int            Bits = 15;
+    if (ContentEncodingType == GZIP)
+        Bits += 16;
 
-	if (ContentEncodingType == GZIP)
-		Bits += 16;
-	else if (ContentEncodingType == DEFLATE)
-		Bits *= -1;
+    Strm.zalloc = Z_NULL;
+    Strm.zfree = Z_NULL;
+    Strm.opaque = Z_NULL;
+    Strm.next_in = (Bytef *)BufferBody.data();
+    Strm.avail_in = BufferBody.size();
+    if (inflateInit2(&Strm, Bits) != Z_OK)
+        return (setErrorNumber(400, "Decompressing The Body Fails "));
 
-	Strm.zalloc = Z_NULL;
-	Strm.zfree = Z_NULL;
-	Strm.opaque = Z_NULL;
-	Strm.next_in = (Bytef *)BufferBody.data();
-	Strm.avail_in = BufferBody.size();
-	if (inflateInit2(&Strm, Bits) != Z_OK)
-		return (setErrorNumber(400, "Decompressing The Body Fails "));
+    char outbuffer[32768];
+    int ret = Z_OK;
+    DecompressedBufferBody.clear();
 
-	char outbuffer[32768];
-	int ret = Z_OK;
-	DecompressedBufferBody.clear();
+    while (true){
+        Strm.next_out = (Bytef *) outbuffer;
+        Strm.avail_out = sizeof(outbuffer);
+        ret = inflate(&Strm, Z_NO_FLUSH);
+        if (ret == Z_STREAM_END){
+            DecompressedBufferBody.append(outbuffer, sizeof(outbuffer) - Strm.avail_out);
+            break ;
+        }
+        else if (ret == Z_OK || ret == Z_STREAM_ERROR){
+            DecompressedBufferBody.append(outbuffer, sizeof(outbuffer) - Strm.avail_out);
+            continue;
+        }
+        else{
+            inflateEnd(&Strm);
+            return (setErrorNumber(400, "Decompressing the body Fails 2222"));
+        }        
+    }
+    BufferBody = DecompressedBufferBody;
+    inflateEnd(&Strm);
 
-	while (ret != Z_STREAM_END){
-		Strm.next_out = (Bytef *) outbuffer;
-		Strm.avail_out = sizeof(outbuffer);
-		ret = inflate(&Strm, Z_NO_FLUSH);
-		if (ret != Z_OK && ret != Z_STREAM_END){
-			inflateEnd(&Strm);
-			return (setErrorNumber(400, "Decompressing the body Fails 2222"));
-		}
-		DecompressedBufferBody.append(outbuffer, sizeof(outbuffer) - Strm.avail_out);
-		
-	}
-	
-	inflateEnd(&Strm);
-
-	// SwitchState(FINISH);
 }
+ 
 
 // reset the variable to parse another request ;
 void        ParseRequest::ResetParserf(){
@@ -602,7 +605,7 @@ int                                                 ParseRequest::getContentEnco
 
 std::string&                                        ParseRequest::getQueryString()                    	{ return (QueryString);}
 
-std::string&                                        ParseRequest::getBufferBody()                    	{ return (RequestBufferbody);}
+std::string&                                        ParseRequest::getBufferBody()                    	{ return (BufferBody);}
 
 std::time_t                                              ParseRequest::getTimeConnection()                   { return (Time); }
 

@@ -3,7 +3,7 @@
 # Configuration
 SERVER_HOST="localhost"
 SERVER_PORT="8004"
-ENDPOINT="/uploads"
+ENDPOINT="/uploads/decompresse_data_gzip"
 JSON_DATA='{"test": "data", "number": 12345}'
 
 # Create temporary file for compressed data
