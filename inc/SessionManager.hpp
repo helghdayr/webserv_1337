@@ -47,7 +47,6 @@ class SessionManager
 		std::string	generateSessionId();
 		std::string	hashSessionId(const std::string& id);
 		void		loadSessionsFromFile();
-		void		saveSessionsToFile();
 		void		cleanupExpiredSessions();
 		std::string	serializeSession(const SessionData& session);
 		SessionData	deserializeSession(const std::string& data);
@@ -67,7 +66,6 @@ class SessionManager
 		void			cleanup();
 		
 		void	saveSession(const std::string& session_id);
-		void	loadAllSessions();
 		void	saveAllSessions();
 };
 

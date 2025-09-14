@@ -100,7 +100,7 @@ const ParseRequest::ParseFuncPtr ParseRequest::ParseTable[] = {
     
     &ParseRequest::parseContentlengthBody,        //    CONTENT_LENGHT_BODY_
 
-    &ParseRequest::parseChunkedBody,                //    CHUNED_BODY_SIZE_
+    &ParseRequest::parseChunkedBody,                //    CHUNKED_BODY_SIZE_
 
     &ParseRequest::parseChunkedBody,            //    READ_THE_CHUNK_
 

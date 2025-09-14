@@ -278,6 +278,8 @@ void DirectiveParser::parseListen(Server* server, const std::vector<std::string>
 
 	if (UniqueListen(server, std::make_pair(host, port)))
 		server->setListen(std::make_pair(host, port));
+	else
+		throw ParseException("Listen must have a unique host:port " + host, currentToken.line);
 }
 
 void DirectiveParser::parseHeaderTimeout(Server* server, const std::vector<std::string>& values)

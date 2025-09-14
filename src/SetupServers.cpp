@@ -305,7 +305,7 @@ void    SetupServers::Run(void)
 				Requests.erase(fd);
 				Responses.erase(fd);
 			}
-			else if (events[i].events & EPOLLIN)
+			if (events[i].events & EPOLLIN)
 			{
 				if (fd_sockets.begin() + endpoints != find(fd_sockets.begin(), fd_sockets.begin() + endpoints, fd))
 				{
@@ -327,7 +327,7 @@ void    SetupServers::Run(void)
 					}
 				}
 			}
-			else if (events[i].events & EPOLLOUT)
+			if (events[i].events & EPOLLOUT)
 			{
 				if (Responses[fd].getBuildRes() == false)
 				{
