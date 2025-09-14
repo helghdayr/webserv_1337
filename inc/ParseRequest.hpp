@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <cstring>
 #include <zlib.h>
+#include <ctime>
 // #include <brotli/decode.h>
 #include "Server.hpp"
 #include "Config.hpp"
@@ -96,7 +97,7 @@ class ParseRequest{
         std::string                                         QueryString;
         std::map<std::string, std::string>                  cookies;
         Location*                                           MatchLocation;
-        time_t                                              Time;
+        std::time_t                                         Time;
         
         // FUNCTOIONS_POINTER_PARSING_TABLES_____________________________________________________________
 
@@ -178,7 +179,7 @@ class ParseRequest{
         std::string                                         getCookie(const std::string& name) const;
         const std::map<std::string, std::string>&           getCookies() const;
         Location*                                           getMatchLocation();
-        time_t                                              getTimeConnection();
+        std::time_t                                         getTimeConnection();
         
         // SETTER_FUNCTIONS__________________________________________________
 
@@ -191,7 +192,7 @@ class ParseRequest{
         void        Reset();
         void        ResetBuffPos();
         void        setContentEncodingType(int Type);
-        void        setTimeConnection(time_t time);
+        void        setTimeConnection(std::time_t time);
 };
 
 #endif

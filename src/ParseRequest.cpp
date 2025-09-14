@@ -604,7 +604,7 @@ std::string&                                        ParseRequest::getQueryString
 
 std::string&                                        ParseRequest::getBufferBody()                    	{ return (RequestBufferbody);}
 
-time_t                                              ParseRequest::getTimeConnection()                   { return (Time); }
+std::time_t                                         ParseRequest::getTimeConnection()                   { return (Time); }
 
 // std::string                                			ParseRequest::getBufferBody_string()                { 
 
@@ -716,7 +716,7 @@ void ParseRequest::setErrorNumber(int Number, std::string ErrorMsg){
     std::cerr << RED << "ERROR: " << errorNumber << "  " << ErrorMsg << RESET << std::endl;
 }
 
-void ParseRequest::setTimeConnection(time_t time)               {Time = time;}
+void ParseRequest::setTimeConnection(std::time_t time)               {Time = time;}
 
 
 
@@ -1166,7 +1166,7 @@ void        ParseRequest::startParse (int fd, const Config& config, Server* serv
             S = server;
         if (CurrntParsState <= ADD_HEADER)
             ReadingPhase = READING_HEADERS;
-        setTimeConnection(time(NULL));
+        setTimeConnection(std::time(NULL));
         ReadAndParseIntilHeadersFinish(Request_Buff, fd, config, server);
         if (CurrntParsState < PARSEARRAYSIZE)
             return ;

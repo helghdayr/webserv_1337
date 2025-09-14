@@ -309,9 +309,9 @@ void    SetupServers::Run(void)
 			{
 				if (fd_sockets.begin() + endpoints != find(fd_sockets.begin(), fd_sockets.begin() + endpoints, fd))
 				{
-					Requests[fd].setTimeConnection(time(NULL));
 					AcceptConnection(fd);
 					AddSocketToEpoll(fd_sockets.back(), EPOLLIN, EPOLL_CTL_ADD);
+					Requests[fd_sockets.back()].setTimeConnection(std::time(NULL));
 				}
 				else
 				{	
@@ -364,8 +364,8 @@ void    SetupServers::Run(void)
 
 				if (!block_serv)
 					block_serv = GetBlockServer(fd);
-
-				if (static_cast<long> (time(NULL) - Requests[fd].getTimeConnection()) >= block_serv->getHeaderTimeout())
+				long time = std::time(NULL) - Requests[fd].getTimeConnection();
+				if (time >= block_serv->getHeaderTimeout())
 				{
 					Responses[fd].SetState(Request_Timeout);
 					Responses[fd].ResponseWithError(DEFAULT);

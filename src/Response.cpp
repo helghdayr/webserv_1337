@@ -212,7 +212,7 @@ void    Response::BuildGetResponse(void)
 	std::ostringstream  os;
 	os << info.st_size;
 
-	responseBody = request.getVersion() + " " + oss.str() + " " + getStrState() + "\r\n";
+	responseBody = Request.getVersion() + " " + oss.str() + " " + getStrState() + "\r\n";
 	responseBody += "Content-Type: " + MIME_Type() + "\r\n";
 	responseBody += "Content-Length: " + os.str() + "\r\n";
 	addCookiesToHeaders();
@@ -303,7 +303,7 @@ void    Response::BuildDeleteResponse(void)
 	if (unlink(path.c_str()) == -1)
 		return (SetState(Internal_Server_Error), ResponseWithError(NONE));
 
-	responseBody = request.getVersion() + " 204 No Content\r\n";
+	responseBody = Request.getVersion() + " 204 No Content\r\n";
 	responseBody += "Content-Length: 0\r\n";
 	responseBody += "Connection: close\r\n\r\n";
 }
@@ -340,7 +340,7 @@ void    Response::BuildPostResponse(void)
 	os << getState();
 	std::string body = "<html><body><h1>Upload Successful</h1></body></html>";
 	oss << body.size();
-	std::string headers = request.getVersion() + " " + os.str() + " " + getStrState() + "\r\n";
+	std::string headers = Request.getVersion() + " " + os.str() + " " + getStrState() + "\r\n";
 	headers += "Content-Type: text/html\r\n";
 	headers += "Content-Length: " + oss.str() + "\r\n";
 	headers += "Connection: close\r\n\r\n";
@@ -355,7 +355,6 @@ bool	Response::MultiPart(std::string body)
 	size_t pos = body.find("Content-Disposition:");
 	ignore = false;
 
-	std::cout << "path === " << path << "\n";
 	if (pos != std::string::npos)
 	{
 		size_t end = body.find('\n', pos);
@@ -658,7 +657,7 @@ void	Response::handleCgiRequest(ParseRequest& request)
 
 void	Response::sendCgiResponse(const CgiResult& cgi_result)
 {
-	responseBody = request.getVersion() + " " + intToString(cgi_result.status_code) + " OK\r\n";
+	responseBody = Request.getVersion() + " " + intToString(cgi_result.status_code) + " OK\r\n";
 	
 	responseBody += cgi_result.headers;
 	
