@@ -604,40 +604,13 @@ std::string&                                        ParseRequest::getQueryString
 
 std::string&                                        ParseRequest::getBufferBody()                    	{ return (RequestBufferbody);}
 
-std::time_t                                         ParseRequest::getTimeConnection()                   { return (Time); }
-
-// std::string                                			ParseRequest::getBufferBody_string()                { 
-
-// 	std::string ReqB(&RequestBufferbody[0], RequestBufferbody.size());	
-	
-// 	return (ReqB);
-
-// }
+std::time_t                                              ParseRequest::getTimeConnection()                   { return (Time); }
 
 size_t                                              ParseRequest::getContentLength()                	{ return (contentLength);}
 
 std::string&                                    ParseRequest::getBufferDecompressedBody()        	        { return (DecompressedBufferBody);}
 
-// std::string	                                		ParseRequest::getBufferDecompressedBody_string()    { 
-
-// 	std::string Decompresstring( &DecompressedBufferBody[0], DecompressedBufferBody.size());
-	
-// 	return (Decompresstring);
-
-// }
-
 std::vector<std::string >&                    ParseRequest::getMultipartBuferBody()            	{ return (MultipartBufferBody);}
-
-// std::vector<std::string >                    ParseRequest::getMultipartBuferBody_string()		{
-
-// 	std::vector<std::string > MultipartStr;
-	
-// 	for (std::vector<std::string >::iterator it = MultipartBufferBody.begin(); it != MultipartBufferBody.end();it++){
-// 		MultipartStr.push_back(std::string(it->begin(), it->end()));
-// 	}
-// 	return (MultipartStr);
-
-// }
 
 Server*                                                ParseRequest::getBlockServer()                     { return S; }
 
@@ -1007,7 +980,6 @@ void ParseRequest::CheckingForBody(){
     if (chunkedEncoding)
         return SwitchState(READCHUNKSIZE);
 
-    // RequestBufferbody.resize(contentLength);
     SwitchState(CONTENTLENGTHBODY);
 
     CheckContentEncoding();

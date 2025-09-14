@@ -261,7 +261,7 @@ bool    Response::ReturnDirective(void)
 	if (code == 301 || code == 302 || code == 303
 		|| code == 307 || code == 308)
 	{
-		responseBody = "HTTP/1.1 " + statuscode.str() + " " + getStrState() + "\r\n";
+		responseBody = Request.getVersion() + " " + statuscode.str() + " " + getStrState() + "\r\n";
 		responseBody += "Location: " + redirecturl + "\r\n";
 		responseBody += "Content-Length: 0\r\n";
 		responseBody += "Connection: close\r\n\r\n";
@@ -272,7 +272,7 @@ bool    Response::ReturnDirective(void)
 		std::ostringstream  os;
 		os << body.size();
 
-		responseBody = "HTTP/1.1 " + statuscode.str() + " " + getStrState() + "\r\n";
+		responseBody = Request.getVersion() + " " + statuscode.str() + " " + getStrState() + "\r\n";
 		responseBody += "Content-Length: " + os.str() + "\r\n";
 		responseBody += "Connection: close\r\n\r\n";
 		responseBody += body;
@@ -624,21 +624,21 @@ void	Response::handleCgiRequest(ParseRequest& request)
 	{
 		Location* location = this->location;
 		if (!location)
-			return (SetState(404), ResponseWithError(NONE));
+			return (SetState(Not_Found), ResponseWithError(NONE));
 		
 		if (!location->isCgiRequest(request.getUri()))
-			return (SetState(404), ResponseWithError(NONE));
+			return (SetState(Not_Found), ResponseWithError(NONE));
 
 		std::string script_path = path;
 
 		if (script_path.empty() || access(script_path.c_str(), F_OK | R_OK) != 0)
-			return (SetState(404), ResponseWithError(NONE));
+			return (SetState(Not_Found), ResponseWithError(NONE));
 
 		std::string file_extension = getFileExtension(request.getUri());
 		std::string interpreter = location->getCgiInterpreter(file_extension);
 
 		if (interpreter.empty())
-			return (SetState(500), ResponseWithError(NONE));
+			return (SetState(Internal_Server_Error), ResponseWithError(NONE));
 
 		Cgi cgi(script_path, interpreter);
 		CgiResult result = cgi.execute(request);

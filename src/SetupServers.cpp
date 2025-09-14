@@ -403,7 +403,9 @@ void    SetupServers::StartSetup(void)
 				index++;
 			}
 		}
-		catch (...){}
+		catch (const std::exception& error){
+			std::cout << error.what();
+		}
 	}
 
 	if (sock_number == 0)
