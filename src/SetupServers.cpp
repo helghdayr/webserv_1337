@@ -240,8 +240,7 @@ void    SetupServers::AcceptConnection(int fd)
 
 	fd_sockets.push_back(fd_accept);
 	this->servers[fd_accept] = this->servers[fd];
-	this->client_to_server[fd_accept] = fd;
-	
+
 	Advance();
 }
 
@@ -259,7 +258,6 @@ void    SetupServers::EraseFd(int fd)
 	close (fd);
 
 	servers.erase(fd);
-	client_to_server.erase(fd);
 	fd_sockets.erase(target);
 	
 	Retreat();
@@ -267,14 +265,7 @@ void    SetupServers::EraseFd(int fd)
 
 Server*	SetupServers::GetBlockServer(int block)
 {
-	std::map<int, int>::iterator client_it = client_to_server.find(block);
-	if (client_it != client_to_server.end()) {
-		int listening_fd = client_it->second;
-		std::map<int, Server*>::iterator server_it = servers.find(listening_fd);
-		if (server_it != servers.end())
-			return server_it->second;
-	}
-	
+
 	std::map<int, Server*>::iterator	it = servers.find(block);
 
 	if (it == servers.end())
