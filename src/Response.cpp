@@ -40,6 +40,9 @@ void    Response::GetFullPath(std::string& path)
 
 		SetPath(ServerBlock.getRoot() + path.erase(0, 1));
 	}
+
+	if (Request.getVersion().empty())
+		Request.setVersion("HTTP/1.1");
 }
 
 bool    Response::CheckAutoIndex(void)
@@ -542,6 +545,9 @@ std::string Response::DefaultForMatchError(void)
 
 void    Response::ResponseWithError(int serve)
 {
+	if (Request.getVersion().empty())
+		Request.setVersion("HTTP/1.1");
+
 	if (serve == DEFAULT)
 	{
 		SetPath(DefaultForMatchError());

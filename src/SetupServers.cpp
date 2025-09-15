@@ -295,6 +295,7 @@ void    SetupServers::Run(void)
 				EraseFd(fd);
 				Requests.erase(fd);
 				Responses.erase(fd);
+				continue ;
 			}
 			if (events[i].events & EPOLLIN)
 			{
@@ -315,6 +316,7 @@ void    SetupServers::Run(void)
 						EraseFd(fd);
 						Requests.erase(fd);
 						Responses.erase(fd);
+						continue ;
 					}
 				}
 			}
@@ -334,16 +336,16 @@ void    SetupServers::Run(void)
 
 				if (byte > 0)
 					Responses[fd].SetBytes(Responses[fd].getBytes() + static_cast<size_t>(byte));
-					
-				if (Responses[fd].getBytes() == ResBody.size() || byte == 0)
+	
+				if (Responses[fd].getBytes() == ResBody.size())
 				{
 					EraseFd(fd);
 					Requests.erase(fd);
 					Responses.erase(fd);
 				}
-
-				else if (byte < 0)
-					continue;
+				
+				else if (byte <= 0)
+					continue ;
 			}
 		}
 		if (number_events == 0)
