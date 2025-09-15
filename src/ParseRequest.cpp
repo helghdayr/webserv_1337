@@ -521,7 +521,7 @@ void        ParseRequest::DecompressBody(){
             DecompressedBufferBody.append(outbuffer, sizeof(outbuffer) - Strm.avail_out);
             break ;
         }
-        else if (ret == Z_OK || ret == Z_STREAM_ERROR){
+        else if (ret == Z_OK){
             DecompressedBufferBody.append(outbuffer, sizeof(outbuffer) - Strm.avail_out);
             continue;
         }
@@ -722,7 +722,6 @@ void    ParseRequest::FindMatchLocation()
 // check if the request parsing is finish or not yet ;
 bool ParseRequest::isFinish(int RecvReturn) {
 
-	(void ) RecvReturn;
     if (CurrntParsState == FINISH)
         std::cout << GRN << "OK " << YLW << "- HTTP request parsed and validated successfully" << RESET << std::endl;
     
