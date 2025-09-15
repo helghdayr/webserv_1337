@@ -22,7 +22,7 @@
 #include <errno.h>
 #include "../inc/SetupServers.hpp"
 
-SetupServers::SetupServers(Config& config) : config(config), sock_number(0), fd_epoll(0), endpoints(0), sessionManager("/tmp/webserv_sessions", 86400)
+SetupServers::SetupServers(Config& config) : config(config), sock_number(0), fd_epoll(0), endpoints(0), sessionManager("/tmp/webserv_sessions")
 {
 	this->StartSetup();
 }
@@ -325,7 +325,9 @@ void    SetupServers::Run(void)
 			{
 				if (Responses[fd].getBuildRes() == false)
 				{
-					handleSessionManagement(Requests[fd]);
+					std::string sid = handleSessionManagement(Requests[fd]);
+					if (!sid.empty())
+						Responses[fd].setCookie("session_id", sid, "/", "", true, 86400);
 					Responses[fd].setSessionManager(&sessionManager);
 					Responses[fd].StartForResponse(Requests[fd], fd);
 					Responses[fd].SetBuildRes(true);
@@ -368,6 +370,13 @@ void    SetupServers::Run(void)
 					Responses[fd].SetBuildRes(true);
 					AddSocketToEpoll(fd, EPOLLOUT, EPOLL_CTL_MOD);
 				}
+			}
+			static time_t last_cleanup = 0;
+			time_t now = std::time(NULL);
+			if (now - last_cleanup >= 100)
+			{
+				last_cleanup = now;
+				sessionManager.cleanupExpired(86400);
 			}
 		}
 	}
@@ -412,16 +421,16 @@ void    SetupServers::StartSetup(void)
 	Run();
 }
 
-void	SetupServers::handleSessionManagement(ParseRequest& request)
+std::string	SetupServers::handleSessionManagement(ParseRequest& request)
 {
 	std::string session_id = request.getCookie("session_id");
-	
-	if (!session_id.empty())
+	if (session_id.empty())
 	{
-		SessionData* session = sessionManager.getSession(session_id);
-		if (session)
-		{
-			sessionManager.updateSessionAccess(session_id);
-		}
+		session_id = sessionManager.createSession();
+		return session_id;
 	}
+	SessionData* session = sessionManager.getSession(session_id);
+	if (session)
+		sessionManager.updateSessionAccess(session_id);
+	return "";
 }

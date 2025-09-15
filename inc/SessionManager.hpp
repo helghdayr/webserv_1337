@@ -14,59 +14,33 @@
 #define SESSION_MANAGER_HPP
 
 #include <string>
-#include <map>
-#include <ctime>
 #include <fstream>
 #include <sstream>
-#include <iostream>
 #include <sys/stat.h>
-#include <unistd.h>
-#include <cstring>
-#include <dirent.h>
-#include <stdlib.h>
+#include <utime.h>
 
 struct SessionData
 {
-	std::map<std::string, std::string>	data;
-	time_t								created_at;
-	time_t								last_accessed;
-	std::string							user_agent;
-	std::string							ip_address;
-	
-	SessionData() : created_at(std::time(NULL)), last_accessed(std::time(NULL)) {}
+	std::string	username;
+	bool		login_status;
+	int			visit_count;
+	SessionData() : username(""), login_status(false), visit_count(0) {}
 };
 
 class SessionManager
 {
 	private:
-		std::map<std::string, SessionData>	sessions;
-		std::string							session_file_path;
-		std::string							session_dir;
-		int									session_timeout;
-		
-		std::string	generateSessionId();
-		std::string	hashSessionId(const std::string& id);
-		void		loadSessionsFromFile();
-		void		cleanupExpiredSessions();
-		std::string	serializeSession(const SessionData& session);
-		SessionData	deserializeSession(const std::string& data);
-		
+		std::string	 session_dir;
+		SessionData	 cached;
+		bool		 loadJson(const std::string& session_id, SessionData& out);
+		void		 saveJson(const std::string& session_id, const SessionData& data);
 	public:
-		SessionManager(const std::string& session_dir = "/tmp/webserv_sessions", 
-					  int timeout = 86400);
+		SessionManager(const std::string& session_dir = "/tmp/webserv_sessions");
 		~SessionManager();
-		
-		std::string		createSession(const std::string& user_agent, const std::string& ip);
-		SessionData*	getSession(const std::string& session_id);
-		bool			hasSession(const std::string& session_id);
-		void			updateSessionAccess(const std::string& session_id);
-		void			setSessionData(const std::string& session_id, const std::string& key, const std::string& value);
-		std::string		getSessionData(const std::string& session_id, const std::string& key);
-		void			removeSession(const std::string& session_id);
-		void			cleanup();
-		
-		void	saveSession(const std::string& session_id);
-		void	saveAllSessions();
+		std::string	createSession();
+		SessionData* getSession(const std::string& session_id);
+		void		updateSessionAccess(const std::string& session_id);
+		void		cleanupExpired(int max_idle_seconds);
 };
 
 #endif 
