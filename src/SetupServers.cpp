@@ -304,6 +304,7 @@ void    SetupServers::Run(void)
 					AcceptConnection(fd);
 					AddSocketToEpoll(fd_sockets.back(), EPOLLIN, EPOLL_CTL_ADD);
 					Requests[fd_sockets.back()].setTimeConnection(std::time(NULL));
+					continue ;
 				}
 				else
 				{	
@@ -329,10 +330,10 @@ void    SetupServers::Run(void)
 					Responses[fd].StartForResponse(Requests[fd], fd);
 					Responses[fd].SetBuildRes(true);
 				}
-
 				std::string	ResBody = Responses[fd].GetResponseBody();
+
 				ssize_t	byte(0);
-				byte = send(fd, ResBody.c_str() + Responses[fd].getBytes(), ResBody.size() - Responses[fd].getBytes(), MSG_NOSIGNAL);
+				byte = send(fd, ResBody.c_str() + Responses[fd].getBytes(), MAXBYTES, MSG_NOSIGNAL);
 
 				if (byte > 0)
 					Responses[fd].SetBytes(Responses[fd].getBytes() + static_cast<size_t>(byte));
@@ -357,7 +358,9 @@ void    SetupServers::Run(void)
 
 				if (!block_serv)
 					block_serv = GetBlockServer(fd);
+
 				long time = std::time(NULL) - Requests[fd].getTimeConnection();
+
 				if (time >= block_serv->getHeaderTimeout())
 				{
 					Responses[fd].SetState(Request_Timeout);

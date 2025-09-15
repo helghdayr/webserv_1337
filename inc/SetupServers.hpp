@@ -24,6 +24,7 @@
 #define MAX_REQUEST 1024
 #define INFINITE    -1
 #define TIMEOFEPOLL 2000
+#define MAXBYTES    512000
 
 class SetupServers
 {
