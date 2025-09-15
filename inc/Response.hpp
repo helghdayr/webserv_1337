@@ -120,11 +120,8 @@ class Response{
 
         bool			shouldExecuteCgi(ParseRequest& request);
         void			sendCgiResponse(const CgiResult& cgi_result);
-        std::string		getFileExtension(const std::string& uri);
-        void			setCookie(const std::string& name, const std::string& value, 
-                                const std::string& path = "/", const std::string& expires = "", 
-                                bool http_only = true);
-        void           addCookiesToHeaders();
+        std::string	getFileExtension(const std::string& uri);
+        void          addCookiesToHeaders();
         
     public:
         Response();
@@ -132,6 +129,9 @@ class Response{
 
         void   	handleCgiRequest(ParseRequest& request);
         void	setSessionManager(SessionManager* sm);
+        void	setCookie(const std::string& name, const std::string& value, 
+                                const std::string& path = "/", const std::string& expires = "", 
+                                bool http_only = true, int max_age_seconds = -1);
         
         // Setters
         

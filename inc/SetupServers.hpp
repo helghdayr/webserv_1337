@@ -47,7 +47,7 @@ class SetupServers
         void                Run(void);
         void                Advance(void);
         void                Retreat(void);
-        void                handleSessionManagement(ParseRequest& request);
+        std::string         handleSessionManagement(ParseRequest& request);
 
         Server*             GetBlockServer(int block);
         

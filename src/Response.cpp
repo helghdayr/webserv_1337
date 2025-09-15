@@ -11,6 +11,7 @@
 /* ************************************************************************** */
 
 #include "../inc/Response.hpp"
+#include <ctime>
 
 Response::Response() : sessionManager(NULL), responseBody(""), buildRes(false), bytes(0){}
 
@@ -702,12 +703,26 @@ void    Response::SetState(int state){this->state = state;}
 void    Response::SetPath(std::string path){this->path = path;}
 
 void	Response::setCookie(const std::string& name, const std::string& value, 
-						  const std::string& path, const std::string& expires, bool http_only)
+						  const std::string& path, const std::string& expires, bool http_only, int max_age_seconds)
 {
 	std::string cookie = "Set-Cookie: " + name + "=" + value;
 	if (!path.empty())
 		cookie += "; Path=" + path;
-	if (!expires.empty())
+	if (max_age_seconds > 0)
+	{
+		cookie += "; Max-Age=" + intToString(max_age_seconds);
+		time_t now = std::time(NULL);
+		time_t exp = now + max_age_seconds;
+		char buf[64];
+		std::tm* gmt = std::gmtime(&exp);
+		if (gmt)
+		{
+			std::strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", gmt);
+			cookie += "; Expires=";
+			cookie += buf;
+		}
+	}
+	else if (!expires.empty())
 		cookie += "; Expires=" + expires;
 	if (http_only)
 		cookie += "; HttpOnly";
@@ -720,8 +735,8 @@ void	Response::addCookiesToHeaders()
 	for (std::vector<std::string>::iterator it = cookies_to_set.begin(); it != cookies_to_set.end(); ++it)
 		responseBody += *it + "\r\n";
 }
-
 void	Response::setSessionManager(SessionManager* sm)
 {
 	sessionManager = sm;
 }
+
