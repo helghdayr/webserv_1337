@@ -6,16 +6,25 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:32:33 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/09/13 21:43:41 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/15 18:12:08 by mrezki           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../inc/Response.hpp"
 #include <ctime>
 
-Response::Response() : sessionManager(NULL), responseBody(""), buildRes(false), bytes(0){}
+Response::Response() : sessionManager(NULL), responseBody(""), buildRes(false), 
+                      bytes(0), file_stream(NULL), file_size(0), 
+                      bytes_sent(0), is_large_file_response(false) {}
 
-Response::~Response(){}
+Response::~Response()
+{
+    if (file_stream)
+    {
+        file_stream->close();
+        delete file_stream;
+    }
+}
 
 void    Response::GetFullPath(std::string& path)
 {
@@ -203,33 +212,94 @@ std::string Response::MIME_Type(void) const
 	return ("application/octet-stream");
 }
 
+bool    Response::IsFileComplete() const { return bytes_sent >= file_size; }
+size_t  Response::GetFileSize() const { return file_size; }
+size_t  Response::GetBytesSent() const { return bytes_sent; }
+
+bool Response::IsLargeFileResponse() const
+{
+    const size_t LARGE_FILE_THRESHOLD = 1024 * 1024; // 1MB
+    return is_large_file_response && file_size > LARGE_FILE_THRESHOLD;
+}
+
+std::string Response::GetNextFileChunk(size_t chunk_size)
+{
+    if (!is_large_file_response || !file_stream || bytes_sent >= file_size)
+        return "";
+
+    char buffer[chunk_size];
+    size_t remaining = file_size - bytes_sent;
+    size_t read_size = (remaining > chunk_size) ? chunk_size : remaining;
+
+    file_stream->read(buffer, read_size);
+    size_t bytes_read = file_stream->gcount();
+
+    if (bytes_read > 0)
+    {
+        bytes_sent += bytes_read;
+        return std::string(buffer, bytes_read);
+    }
+
+    return "";
+}
+
 void    Response::BuildGetResponse(void)
 {
-	std::ostringstream  oss;
+    std::ostringstream  oss;
+    oss << getState();
 
-	oss << getState();
+    struct stat info;
+    stat(path.c_str(), &info);
+    file_size = info.st_size;
 
-	struct stat info;
+    std::ostringstream  os;
+    os << file_size;
 
-	stat(path.c_str(), &info);
+    responseBody = Request.getVersion() + " " + oss.str() + " " + getStrState() + "\r\n";
+    responseBody += "Content-Type: " + MIME_Type() + "\r\n";
+    responseBody += "Content-Length: " + os.str() + "\r\n";
+    addCookiesToHeaders();
+    responseBody += "Connection: close\r\n\r\n";
 
-	std::ostringstream  os;
-	os << info.st_size;
+    const size_t LARGE_FILE_THRESHOLD = 1024 * 1024; // 1MB
+    if (file_size > LARGE_FILE_THRESHOLD)
+    {
+        is_large_file_response = true;
+        bytes_sent = 0;
+        
+        if (file_stream)
+        {
+            file_stream->close();
+            delete file_stream;
+        }
+        
+        file_stream = new std::ifstream(path.c_str(), std::ios::in | std::ios::binary);
+        
+        if (!file_stream || !file_stream->is_open())
+        {
+            is_large_file_response = false;
+            ReadEntireFileIntoResponse();
+        }
+    }
+    else
+        ReadEntireFileIntoResponse();
+}
 
-	responseBody = Request.getVersion() + " " + oss.str() + " " + getStrState() + "\r\n";
-	responseBody += "Content-Type: " + MIME_Type() + "\r\n";
-	responseBody += "Content-Length: " + os.str() + "\r\n";
-	addCookiesToHeaders();
-	responseBody += "Connection: close\r\n\r\n";
-
-	std::ifstream fd(path.c_str(), std::ios::in | std::ios::binary);
-	if (fd)
-	{
-		std::ostringstream body;
-		body << fd.rdbuf();
-		responseBody += body.str();
-		fd.close();
-	}
+void Response::ReadEntireFileIntoResponse()
+{
+    std::ifstream fd(path.c_str(), std::ios::in | std::ios::binary);
+    if (fd)
+    {
+        std::ostringstream body;
+        body << fd.rdbuf();
+        responseBody += body.str();
+        fd.close();
+    }
+    else
+    {
+        SetState(Internal_Server_Error);
+        ResponseWithError(NONE);
+    }
 }
 
 bool    Response::ReturnDirective(void)

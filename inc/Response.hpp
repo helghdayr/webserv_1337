@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/16 16:28:12 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/08/27 13:17:41 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/15 18:51:42 by mrezki           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -114,8 +114,12 @@ class Response{
         std::string         responseBody;
         bool                buildRes;
         bool                ignore;
-        size_t              bytes;
-		
+		size_t              bytes;
+		std::ifstream*       file_stream;
+		size_t              file_size;
+		size_t              bytes_sent;
+		bool                is_large_file_response;
+
 
 
         bool			shouldExecuteCgi(ParseRequest& request);
@@ -153,8 +157,11 @@ class Response{
         std::string MIME_Type(void) const;
         std::string ConnectionState(void) const;
         std::string GetResponseBody(void) const;
+        std::string GetNextFileChunk(size_t chunk_size);
         
         // Startresponse
+		
+		void	ReadEntireFileIntoResponse();
         
         void    StartForResponse(ParseRequest Request, int fd_client);
         
@@ -197,6 +204,11 @@ class Response{
         bool    MultiPart(std::string body);
 
         bool    Chunked(void);
+		bool	IsFileResponse() const;
+		bool	IsFileComplete() const;
+		bool	IsLargeFileResponse() const;
+		size_t	GetFileSize() const;
+		size_t	GetBytesSent() const;
         
 };
 

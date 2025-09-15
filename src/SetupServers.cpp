@@ -6,7 +6,7 @@
 /*   By: hael-ghd <hael-ghd@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/05/21 20:57:28 by hael-ghd          #+#    #+#             */
-/*   Updated: 2025/09/13 20:59:47 by hael-ghd         ###   ########.fr       */
+/*   Updated: 2025/09/15 18:50:59 by mrezki           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -332,23 +332,85 @@ void    SetupServers::Run(void)
 					Responses[fd].StartForResponse(Requests[fd], fd);
 					Responses[fd].SetBuildRes(true);
 				}
-				std::string	ResBody = Responses[fd].GetResponseBody();
 
-				ssize_t	byte(0);
-				byte = send(fd, ResBody.c_str() + Responses[fd].getBytes(), MAXBYTES, MSG_NOSIGNAL);
+				std::string data_to_send;
+				size_t data_offset = Responses[fd].getBytes();
 
-				if (byte > 0)
-					Responses[fd].SetBytes(Responses[fd].getBytes() + static_cast<size_t>(byte));
-	
-				if (Responses[fd].getBytes() == ResBody.size())
+				if (Responses[fd].IsLargeFileResponse())
+				{
+					std::string headers = Responses[fd].GetResponseBody();
+
+					if (data_offset < headers.size())
+						data_to_send = headers.substr(data_offset, MAXBYTES);
+					else
+					{
+						size_t file_offset = data_offset - headers.size();
+						if (file_offset < Responses[fd].GetFileSize())
+						{
+							static std::map<int, std::string> file_chunks;
+
+							if (file_chunks.find(fd) == file_chunks.end() || file_chunks[fd].empty())
+								file_chunks[fd] = Responses[fd].GetNextFileChunk(MAXBYTES);
+
+							if (!file_chunks[fd].empty())
+							{
+								data_to_send = file_chunks[fd];
+								file_chunks[fd].clear();
+							}
+						}
+					}
+				}
+				else
+				{
+					std::string ResBody = Responses[fd].GetResponseBody();
+					if (data_offset < ResBody.size())
+					{
+						data_to_send = ResBody.substr(data_offset, MAXBYTES);
+					}
+				}
+
+				if (!data_to_send.empty())
+				{
+					ssize_t bytes_sent = send(fd, data_to_send.c_str(), data_to_send.size(), MSG_NOSIGNAL);
+
+					if (bytes_sent > 0)
+					{
+						Responses[fd].SetBytes(Responses[fd].getBytes() + bytes_sent);
+
+						if (Responses[fd].IsLargeFileResponse())
+						{
+							std::string headers = Responses[fd].GetResponseBody();
+							if (Responses[fd].getBytes() >= headers.size() + Responses[fd].GetFileSize())
+							{
+								EraseFd(fd);
+								Requests.erase(fd);
+								Responses.erase(fd);
+							}
+						}
+						else
+						{
+							std::string ResBody = Responses[fd].GetResponseBody();
+							if (Responses[fd].getBytes() >= ResBody.size())
+							{
+								EraseFd(fd);
+								Requests.erase(fd);
+								Responses.erase(fd);
+							}
+						}
+					}
+					else if (bytes_sent < 0)
+					{
+						EraseFd(fd);
+						Requests.erase(fd);
+						Responses.erase(fd);
+					}
+				}
+				else
 				{
 					EraseFd(fd);
 					Requests.erase(fd);
 					Responses.erase(fd);
 				}
-				
-				else if (byte <= 0)
-					continue ;
 			}
 		}
 		if (number_events == 0)
