@@ -836,5 +836,5 @@ siege -c 50 -t 30s http://localhost:8080/
 | `hael-ghd` | Server + epoll + Response — `Server`, `SetupServers`, `Response`, `DirectoryListing` |
 | `mrezki` | CGI + Config + Sessions — `Cgi`, `Config`, `Location`, `SessionManager` |
 
-**School:** 42  
+**School:** 1337 from 42
 **Project:** Webserv
